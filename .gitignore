@@ -1,0 +1,43 @@
+# ---- Secrets (never commit) ----
+**/.env
+**/.env.backup
+**/.env.production
+**/auth.json
+**/storage/*.key
+
+# ---- Dependencies (installed via composer/npm) ----
+**/vendor/
+**/node_modules/
+
+# ---- Laravel build / cache ----
+**/public/build
+**/public/hot
+**/public/storage
+**/storage/framework/cache/*
+**/storage/framework/sessions/*
+**/storage/framework/views/*
+**/storage/logs/*
+**/bootstrap/cache/*.php
+*.log
+
+# ---- QA / automation artifacts (generated during testing) ----
+.playwright-mcp/
+/attendance.png
+/dashboard.png
+/employees.png
+/emp-show.png
+/hr-dashboard.png
+/kiosk.png
+/offices.png
+/report.png
+/report-late.png
+/report-outliers.png
+/roles.png
+/settings.png
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.phpunit.result.cache
