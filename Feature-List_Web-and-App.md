@@ -144,10 +144,10 @@ absence against working days only. Weekends and company holidays count as neithe
 ## A9. Notifications (Web)
 | # | Feature | Status |
 |---|---|---|
-| A9.1 | In-app notification bell + centre | ⬜ |
-| A9.2 | Email notifications | ⬜ |
+| A9.1 | In-app notification bell + centre | ✅ one inbox shared by the dashboard and the portal |
+| A9.2 | Email notifications | 🟡 leave emails queued and rendering; MAIL_MAILER still `log` |
 | A9.3 | Late-arrival alert to HR | ⬜ |
-| A9.4 | Leave request / approval / rejection alerts | ⬜ |
+| A9.4 | Leave request / approval / rejection alerts | ✅ routed by NotificationService, both stages |
 | A9.5 | Schedule update alerts | ⬜ |
 | A9.6 | Missing-checkout reminder | ⬜ |
 
@@ -245,7 +245,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | ⬜ |
 | C1.10 | Immutable audit log for attendance records | ⬜ |
-| C1.11 | Automated test suite (feature + unit) | ✅ 369 feature tests covering attendance, leave, roster, swaps and the API |
+| C1.11 | Automated test suite (feature + unit) | ✅ 390 feature tests covering attendance, leave, roster, swaps and the API |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ⬜ |
 | C1.14 | Production deployment (HTTPS, env hardening) | ⬜ |
