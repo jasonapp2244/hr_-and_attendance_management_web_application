@@ -51,7 +51,7 @@
 | A3.7 | Employee profile photo upload | ⬜ |
 | A3.8 | Document vault (contract, ID, certificates) with expiry alerts | ⬜ |
 | A3.9 | Emergency contact & personal details | ⬜ |
-| A3.10 | Org chart / reporting-manager hierarchy | ⬜ |
+| A3.10 | Org chart / reporting-manager hierarchy | 🟡 reporting line set + cycle-safe; no org chart view |
 | A3.11 | Employee export (CSV / Excel) | ⬜ |
 | A3.12 | Onboarding & offboarding checklists | ⬜ |
 
@@ -96,17 +96,18 @@
 |---|---|---|
 | A6.1 | Leave types (annual, sick, unpaid, casual…) | ✅ |
 | A6.2 | Leave request submission | ✅ |
-| A6.3 | Multi-step approval workflow (manager → HR) | ⬜ next |
+| A6.3 | Multi-step approval workflow (manager → HR) | ✅ |
 | A6.4 | Leave balance tracking & accrual rules | 🟡 balances tracked; no accrual rules |
 | A6.5 | Leave history & status management | ✅ |
 | A6.6 | Company leave policy configuration | 🟡 types + weekend config; no rules engine |
-| A6.7 | Team leave calendar / conflict detection | 🟡 own-overlap blocked; no team calendar |
+| A6.7 | Team leave calendar / conflict detection | 🟡 conflicts flagged to the manager; no calendar view |
 | A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ⬜ |
 | A6.9 | Carry-forward & year-end processing | ⬜ |
 
 *Built so far: leave types, the employee self-service screen (balances, apply, withdraw),
-weekend- and holiday-aware day counting, balance enforcement, and the company-wide leave
-register for Admin/HR. Requests needing sign-off sit as **Pending** until A6.3 lands.*
+weekend- and holiday-aware day counting, balance enforcement, the company-wide leave register
+for Admin/HR, and the two-step approval chain — line manager, then HR. An employee with no
+manager set goes straight to HR. Days are deducted only on final approval.*
 
 ## A7. Reporting & Analytics
 | # | Feature | Status |
