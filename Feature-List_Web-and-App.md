@@ -240,13 +240,13 @@ absence against working days only. Weekends and company holidays count as neithe
 | C1.3 | `/attendance/check`, `/attendance/history`, `/attendance/today` | ✅ same AttendanceService as the web button — one set of punch rules |
 | C1.4 | `/leave/*` endpoints | ✅ balances, apply, list, withdraw + the manager inbox — all via LeaveService |
 | C1.5 | `/schedule`, `/profile` endpoints | ✅ published roster only, leave/holiday/weekend aware; profile read + contact edit + password |
-| C1.6 | Device token registration for push | ⬜ |
-| C1.7 | API rate limiting + throttling | 🟡 login 5/min, punch 20/min; remaining endpoints still to tune |
+| C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
+| C1.7 | API rate limiting + throttling | ✅ per-user limiters — 120/min ceiling, login 5, punch 20, writes 30 |
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | ⬜ |
 | C1.10 | Immutable audit log for attendance records | ⬜ |
-| C1.11 | Automated test suite (feature + unit) | ✅ 336 feature tests covering attendance, leave, roster, swaps and the API |
-| C1.12 | API documentation (Scribe / OpenAPI) | ⬜ |
+| C1.11 | Automated test suite (feature + unit) | ✅ 369 feature tests covering attendance, leave, roster, swaps and the API |
+| C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ⬜ |
 | C1.14 | Production deployment (HTTPS, env hardening) | ⬜ |
 
