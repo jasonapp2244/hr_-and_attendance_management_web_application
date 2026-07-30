@@ -235,14 +235,14 @@ absence against working days only. Weekends and company holidays count as neithe
 
 | # | Feature | Status |
 |---|---|---|
-| C1.1 | **Laravel Sanctum token auth + `routes/api.php`** ⛔ *blocker for all of Part B* | ⬜ |
-| C1.2 | `/auth/login`, `/auth/logout`, `/auth/me` | ⬜ |
+| C1.1 | **Laravel Sanctum token auth + `routes/api.php`** | ✅ |
+| C1.2 | `/auth/login`, `/auth/logout`, `/auth/me` (+ `logout-all`, `devices`) | ✅ |
 | C1.3 | `/attendance/check`, `/attendance/history`, `/attendance/today` | ⬜ |
 | C1.4 | `/leave/*` endpoints | ⬜ |
 | C1.5 | `/schedule`, `/profile` endpoints | ⬜ |
 | C1.6 | Device token registration for push | ⬜ |
-| C1.7 | API rate limiting + throttling | ⬜ |
-| C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ⬜ |
+| C1.7 | API rate limiting + throttling | 🟡 login throttled 5/min; per-endpoint limits still to tune |
+| C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | ⬜ |
 | C1.10 | Immutable audit log for attendance records | ⬜ |
 | C1.11 | Automated test suite (feature + unit) | ⬜ |
