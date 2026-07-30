@@ -66,7 +66,7 @@
 | A4.6 | Attendance log table (employee, office, type, time, status) | ✅ |
 | A4.7 | Filterable, paginated attendance history | ✅ |
 | A4.8 | Late / early-leave status vs assigned shift | ✅ |
-| A4.9 | Daily summary (present / late / absent / headcount) | ✅ |
+| A4.9 | Daily summary (present / late / on leave / absent / headcount) | ✅ |
 | A4.10 | Monthly attendance scoring (on-time %, late count) | ✅ |
 | A4.11 | Weekly rollup summaries | ⬜ |
 | A4.12 | Manual attendance entry / correction by HR (with audit reason) | ⬜ |
@@ -101,13 +101,17 @@
 | A6.5 | Leave history & status management | ✅ |
 | A6.6 | Company leave policy configuration | 🟡 types + weekend config; no rules engine |
 | A6.7 | Team leave calendar / conflict detection | 🟡 conflicts flagged to the manager; no calendar view |
-| A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ⬜ |
+| A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ✅ |
 | A6.9 | Carry-forward & year-end processing | ⬜ |
 
 *Built so far: leave types, the employee self-service screen (balances, apply, withdraw),
 weekend- and holiday-aware day counting, balance enforcement, the company-wide leave register
 for Admin/HR, and the two-step approval chain — line manager, then HR. An employee with no
 manager set goes straight to HR. Days are deducted only on final approval.*
+
+*Approved leave now feeds attendance: it is reported as leave rather than absence on the
+dashboard, the attendance overview and the department report, and the monthly score measures
+absence against working days only. Weekends and company holidays count as neither.*
 
 ## A7. Reporting & Analytics
 | # | Feature | Status |
