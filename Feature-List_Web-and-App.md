@@ -17,7 +17,7 @@
 |---|---|---|
 | A1.1 | Secure login / logout (Laravel session) | ✅ |
 | A1.2 | Role-based access — Admin, HR, Employee (Spatie RBAC) | ✅ |
-| A1.3 | Granular permissions per role (16 seeded) | ✅ |
+| A1.3 | Granular permissions per role (18 seeded) | ✅ |
 | A1.4 | Roles & permissions editor UI | ✅ |
 | A1.5 | Profile page + change password | ✅ |
 | A1.6 | Password reset via email ("forgot password") | ⬜ |
@@ -89,7 +89,7 @@
 | A5.6 | Rotating / night shift patterns | ✅ |
 | A5.7 | Break rule configuration | 🟡 unpaid break deducted from paid hours; no break punches |
 | A5.8 | Roster drag-and-drop planner + publish to staff | 🟡 grid planner + draft/publish; no drag-and-drop |
-| A5.9 | Shift swap requests between employees | ⬜ |
+| A5.9 | Shift swap requests between employees | ✅ |
 
 ## A6. Leave Management
 | # | Feature | Status |
