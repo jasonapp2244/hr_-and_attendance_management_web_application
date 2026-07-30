@@ -83,11 +83,11 @@
 |---|---|---|
 | A5.1 | Shift creation (start, end, grace period) | ✅ |
 | A5.2 | Shift assignment per department | ✅ |
-| A5.3 | Weekly roster view | ✅ |
+| A5.3 | Weekly roster view | ✅ leave, holidays and company weekend aware |
 | A5.4 | Shift-driven attendance validation | ✅ |
-| A5.5 | Per-employee shift override | ⬜ |
-| A5.6 | Rotating / night shift patterns | ⬜ |
-| A5.7 | Break rule configuration | ⬜ |
+| A5.5 | Per-employee shift override | ✅ |
+| A5.6 | Rotating / night shift patterns | 🟡 overnight shifts fully handled; no rotating patterns |
+| A5.7 | Break rule configuration | 🟡 unpaid break deducted from paid hours; no break punches |
 | A5.8 | Roster drag-and-drop planner + publish to staff | ⬜ |
 | A5.9 | Shift swap requests between employees | ⬜ |
 
