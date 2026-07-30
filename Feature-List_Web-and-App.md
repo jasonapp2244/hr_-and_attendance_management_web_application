@@ -34,7 +34,7 @@
 | A2.4 | Departments — CRUD & assignment | ✅ |
 | A2.5 | Designations / job titles | ✅ |
 | A2.6 | General settings page | ✅ |
-| A2.7 | Company holiday calendar | 🟡 honoured by leave; no admin screen yet |
+| A2.7 | Company holiday calendar | ✅ |
 | A2.8 | Weekend / working-days configuration per office | 🟡 company-level setting; no UI |
 | A2.9 | Attendance & leave policy rules engine | ⬜ |
 | A2.10 | Multi-company (SaaS tenancy) support | ⬜ |
@@ -97,9 +97,9 @@
 | A6.1 | Leave types (annual, sick, unpaid, casual…) | ✅ |
 | A6.2 | Leave request submission | ✅ |
 | A6.3 | Multi-step approval workflow (manager → HR) | ✅ |
-| A6.4 | Leave balance tracking & accrual rules | 🟡 balances tracked; no accrual rules |
+| A6.4 | Leave balance tracking & accrual rules | 🟡 tracked, provisioned & HR-adjustable; no automatic accrual |
 | A6.5 | Leave history & status management | ✅ |
-| A6.6 | Company leave policy configuration | 🟡 types + weekend config; no rules engine |
+| A6.6 | Company leave policy configuration | 🟡 types + holidays + weekend config; no rules engine |
 | A6.7 | Team leave calendar / conflict detection | 🟡 conflicts flagged to the manager; no calendar view |
 | A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ✅ |
 | A6.9 | Carry-forward & year-end processing | ⬜ |
