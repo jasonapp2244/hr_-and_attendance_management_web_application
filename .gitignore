@@ -48,3 +48,7 @@ Thumbs.db
 .idea/
 .vscode/
 .phpunit.result.cache
+
+# Firebase service-account key — can push to every installation of the app.
+**/storage/app/firebase/
+*service-account*.json
