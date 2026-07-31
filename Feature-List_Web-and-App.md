@@ -243,12 +243,12 @@ absence against working days only. Weekends and company holidays count as neithe
 | C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
 | C1.7 | API rate limiting + throttling | ✅ per-user limiters — 120/min ceiling, login 5, punch 20, writes 30 |
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
-| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 scheduler wired with two jobs; needs one cron entry in production |
-| C1.10 | Immutable audit log for attendance records | ⬜ |
-| C1.11 | Automated test suite (feature + unit) | ✅ 411 feature tests covering attendance, leave, roster, swaps and the API |
+| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. Needs the cron line + a queue worker wherever it runs |
+| C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
+| C1.11 | Automated test suite (feature + unit) | ✅ 433 feature tests covering attendance, leave, roster, swaps, the API, the audit trail and backups |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
-| C1.13 | Database backup & restore strategy | ⬜ |
-| C1.14 | Production deployment (HTTPS, env hardening) | ⬜ |
+| C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
+| C1.14 | Production deployment (HTTPS, env hardening) | ⬜ deferred — not in scope yet |
 
 ---
 
