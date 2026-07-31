@@ -17,6 +17,13 @@
 **/storage/framework/sessions/*
 **/storage/framework/views/*
 **/storage/logs/*
+
+# Database dumps. Every employee record, every punch, every leave reason — a
+# copy of the entire HR database. Never in version control, and never anywhere
+# the web server can serve it.
+**/storage/backups/
+*.sql
+*.sql.gz
 **/bootstrap/cache/*.php
 *.log
 
