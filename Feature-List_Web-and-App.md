@@ -74,8 +74,8 @@
 | A4.14 | Overtime calculation & tracking | ⬜ |
 | A4.15 | Break in / break out punches | ⬜ |
 | A4.16 | Geofence enforcement (block punch outside office radius) | ⬜ optional |
-| A4.17 | Auto-absent marking for missed days (scheduled job) | ⬜ |
-| A4.18 | Missing-checkout auto-close policy | ⬜ |
+| A4.17 | Auto-absent marking for missed days (scheduled job) | 🟡 absence stays derived; nightly job refreshes the scores that count it |
+| A4.18 | Missing-checkout auto-close policy | ✅ closes at the scheduled shift end, marked `source: auto` |
 | A4.19 | Live "who's in right now" board | ⬜ |
 
 ## A5. Shift & Schedule Management
@@ -149,7 +149,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | A9.3 | Late-arrival alert to HR | ⬜ |
 | A9.4 | Leave request / approval / rejection alerts | ✅ routed by NotificationService, both stages |
 | A9.5 | Schedule update alerts | ⬜ |
-| A9.6 | Missing-checkout reminder | ⬜ |
+| A9.6 | Missing-checkout reminder | ✅ sent once, a configurable grace after the shift ends |
 
 ---
 
@@ -243,9 +243,9 @@ absence against working days only. Weekends and company holidays count as neithe
 | C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
 | C1.7 | API rate limiting + throttling | ✅ per-user limiters — 120/min ceiling, login 5, punch 20, writes 30 |
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
-| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | ⬜ |
+| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 scheduler wired with two jobs; needs one cron entry in production |
 | C1.10 | Immutable audit log for attendance records | ⬜ |
-| C1.11 | Automated test suite (feature + unit) | ✅ 390 feature tests covering attendance, leave, roster, swaps and the API |
+| C1.11 | Automated test suite (feature + unit) | ✅ 411 feature tests covering attendance, leave, roster, swaps and the API |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ⬜ |
 | C1.14 | Production deployment (HTTPS, env hardening) | ⬜ |
