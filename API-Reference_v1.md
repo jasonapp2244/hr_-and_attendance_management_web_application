@@ -467,6 +467,49 @@ request) · `validation_failed` (422, already decided or already passed up)
 
 ---
 
+## 7b. Team
+
+### `GET /team/attendance`
+
+Who on **your own team** is in today. Requires `approve-leave`, and answers only
+for your direct reports — a team lead is not HR, and the web dashboard is where
+company-wide attendance lives.
+
+| Query | Default | Notes |
+|---|---|---|
+| `date` | today | `YYYY-MM-DD`. A future date is refused: nobody can be absent for a day that has not happened. |
+
+```json
+{
+  "ok": true, "date": "2026-08-01", "timezone": "America/New_York",
+  "summary": { "total": 5, "present": 3, "in_now": 2, "late": 1,
+               "on_leave": 1, "absent": 1, "off": 0 },
+  "team": [
+    { "employee_id": 2, "name": "Emily Johnson", "employee_code": "EMP-0002",
+      "status": "present", "late": true,
+      "first_in": "09:14 AM", "last_out": null,
+      "is_clocked_in": true, "worked_minutes": 214,
+      "shift": { "name": "Morning Shift", "start_time": "09:00:00", "end_time": "17:00:00" } }
+  ]
+}
+```
+
+`status` uses the same vocabulary as `/attendance/history` — `present`, `leave`,
+`holiday`, `day_off`, `weekend`, `absent` — and is computed by the same code, so
+a manager and the person they manage never see two different words for one day.
+
+**`in_now` is not `present`.** Somebody who worked this morning and went home is
+present for the day but not on the floor. A manager asking "who is here" wants
+the first number; a manager asking "who turned up" wants the second.
+
+A manager with nobody reporting to them gets `team: []` and a zeroed summary,
+not an error.
+
+**Failures:** `invalid_range` (422, a future date) · `forbidden` (403, no
+`approve-leave` permission) · `validation_failed` (422)
+
+---
+
 ## 8. Schedule
 
 ### `GET /schedule`
