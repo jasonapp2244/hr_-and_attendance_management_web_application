@@ -1,0 +1,14 @@
+# Server files are checked out on Linux and must keep LF endings regardless of
+# the platform they were edited on. This is not cosmetic: a shell script with
+# CRLF fails on Linux with "bad interpreter: /bin/bash^M", and systemd and cron
+# are similarly unforgiving about the trailing carriage return.
+#
+# hrms/ has its own .gitattributes (Laravel's) which does not reach up here.
+deploy/*            text eol=lf
+deploy/deploy.sh    text eol=lf
+*.sh                text eol=lf
+*.service           text eol=lf
+*.cron              text eol=lf
+
+*.md   diff=markdown
+*.html diff=html
