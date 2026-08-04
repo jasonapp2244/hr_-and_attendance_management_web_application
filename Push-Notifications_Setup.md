@@ -30,16 +30,23 @@ Project settings → **Your apps** → Add app → Android.
 Package name must be exactly:
 
 ```
-com.hrattendance.hrms_mobile
+com.hrms.attendance
 ```
 
+This has to match the app's `applicationId` character for character — Firebase
+issues credentials per package name, and a mismatch fails at registration with
+an error that does not name the cause. The value lives in
+`mobile/android/app/build.gradle.kts` and is the app's permanent Play identity;
+check there rather than trusting this document if the two ever disagree.
+
 Download `google-services.json` and place it in the Flutter repo at
-`android/app/google-services.json`. It is gitignored there.
+`mobile/android/app/google-services.json`. It is gitignored there.
 
 ### 3. Register the iOS app (only when you have an Apple Developer account)
 
-Same screen → iOS. Bundle ID `com.hrattendance.hrmsMobile`. Download
-`GoogleService-Info.plist`.
+Same screen → iOS. Bundle ID `com.hrms.attendance` — the same string as Android,
+which is what `PRODUCT_BUNDLE_IDENTIFIER` in the Xcode project is set to.
+Download `GoogleService-Info.plist`.
 
 iOS also needs an **APNs authentication key** (`.p8`) from the Apple Developer
 portal, uploaded in Firebase under Project settings → Cloud Messaging. Android

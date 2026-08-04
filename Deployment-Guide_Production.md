@@ -322,14 +322,17 @@ what it needs:
 - Push delivery server-side, waiting only on a Firebase project
 - A public privacy policy and data-deletion page for the store listings
 
-Package names are already fixed and referenced in `config/fcm.php` and
-`Push-Notifications_Setup.md`: `com.hrattendance.hrms_mobile` on Android,
-`com.hrattendance.hrmsMobile` on iOS. The Android notification channel must be
-`hrms_default` — Android 8+ silently drops any notification whose channel does
-not exist.
+The app ships as `com.hrms.attendance` on both platforms — Android
+`applicationId` and iOS `PRODUCT_BUNDLE_IDENTIFIER`. Firebase must be registered
+against that exact string. The Android notification channel must be
+`hrms_default` (`config/fcm.php`) — Android 8+ silently drops any notification
+whose channel does not exist.
 
-The thinnest first release is B1 (login) plus B2.1–B2.3 (the punch button, the
-status card, GPS at punch).
+The app itself is built: login, the punch button and status card, history,
+leave, roster and a manager tab, verified on an emulator against a live server.
+What it still needs from a deployed host is a real `API_BASE`, since a release
+build refuses to start pointed at a development address. See
+`Store-Submission_Checklist.md` for what the two stores still want.
 
 ---
 
