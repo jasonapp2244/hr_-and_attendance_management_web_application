@@ -146,37 +146,68 @@ Then migrate:
 sudo -u www-data php artisan migrate --force
 ```
 
-**Do not run `db:seed` on production.** `DemoDataSeeder` creates
-`admin@hrms.test` and `hr@hrms.test`, both with the password `password`, plus a
-set of fictional employees. Create the real first administrator by hand instead:
+Then create the company and the first administrator:
 
 ```bash
-sudo -u www-data php artisan tinker
+sudo -u www-data php artisan hrms:install
 ```
 
-```php
-$company = App\Models\Company::create([
-    'name' => 'Your Company',
-    'timezone' => 'America/New_York',   // decides what "09:00" means for everyone
-    'currency' => 'USD',
-]);
+It asks for the company name, timezone and currency, then the administrator's
+name, email and password, shows you the lot, and creates it in one transaction —
+so a failure halfway cannot leave you with a company nobody can sign in to.
+It also seeds the roles and permissions, which is the step most often forgotten
+when this is done by hand; without it the administrator exists but every page
+refuses them, and nothing says why.
 
-$user = App\Models\User::create([
-    'name' => 'Your Name',
-    'email' => 'you@yourcompany.com',
-    'password' => Hash::make('a-real-password'),
-    'company_id' => $company->id,
-]);
+For an unattended deploy, pass everything instead:
 
-// Seeds only the roles and permissions — no demo people.
-Artisan::call('db:seed', ['--class' => 'Database\\Seeders\\RolePermissionSeeder', '--force' => true]);
-
-$user->assignRole('admin');
+```bash
+sudo -u www-data php artisan hrms:install --no-interaction \
+    --company="Your Company" \
+    --timezone=America/New_York \
+    --currency=USD \
+    --name="Your Name" \
+    --email=you@yourcompany.com \
+    --password='a-real-password'
 ```
 
 The company timezone is the one to get right. Attendance is judged against shift
 times in it, so a wrong value marks the entire workforce late every morning —
-and produces plausible data rather than an error. `hrms:preflight` checks it.
+and produces plausible data rather than an error. The command validates it
+against the real IANA list, and `hrms:preflight` checks it again later.
+
+### Adding an administrator to a company that already exists
+
+If the install already has staff but no administrator — the account was lost, or
+a purge removed the seeded one — attach the new administrator to the existing
+company rather than making another:
+
+```bash
+sudo -u www-data php artisan hrms:install --company-id=1
+```
+
+Run it without arguments and it lists the companies with their employee counts
+and asks. Getting this wrong is unusually hard to spot: the sign-in works, the
+dashboard loads, and it is empty — because every employee is on the other
+company and companies cannot see each other. `--force` is what creates a second
+company, and it exists only for installs that genuinely run two.
+
+**Do not run `db:seed --class=DemoDataSeeder` on production.** It creates
+`admin@hrms.test` and `hr@hrms.test`, both with the password `password`, plus a
+set of fictional employees and a fortnight of attendance they never worked. A
+plain `php artisan db:seed` is safe — it now creates roles and permissions only
+— but if a demo seeder was ever run here by mistake, clear it out:
+
+```bash
+sudo -u www-data php artisan hrms:purge-demo --dry-run   # read this first
+sudo -u www-data php artisan hrms:purge-demo --force
+```
+
+Read the dry run properly. Attendance and leave cascade from `employees`, so
+deleting a demo employee takes any real rows attached to them as well — on a
+server that was tested before go-live, the real punches are usually against a
+demo account. The dry run lists those rows individually; `--keep-employees=CODE`
+spares the employee they belong to.
 
 ---
 

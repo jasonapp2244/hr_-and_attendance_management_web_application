@@ -1,8 +1,13 @@
 # Push notifications — what is built, and what you have to do
 
-Server-side delivery is built and tested. It is **switched off** until Firebase
-credentials exist, and does nothing at all until then — an install with no key
-sends no push rather than failing every notification.
+Both halves are now built: the server sends, and the app registers, receives and
+routes. Both are **switched off** until Firebase credentials exist, and neither
+fails without them — a server with no key sends no push rather than failing
+every notification, and an app with no `google-services.json` builds and runs
+with notifications simply absent.
+
+So the work below is the whole of what is left. It is all console and account
+work; none of it can be done in code.
 
 Three notifications carry a push version: a leave request arriving for a
 manager, a decision reaching the employee, and the reminder for somebody still
@@ -116,20 +121,49 @@ each.
 
 ---
 
-## Still to do in the app
+## What the app does
 
-The Flutter side does not yet register a token or display an incoming
-notification. That is the remaining half:
+All of it lives in `mobile/lib/core/push.dart`, owned by `Session` because
+registration is a consequence of signing in.
 
-- `firebase_core` and `firebase_messaging` packages
-- Ask for notification permission (Android 13+ requires it explicitly)
-- Register the token with `POST /api/v1/devices` after sign-in
-- Create the Android notification channel `hrms_default` — Android 8+ silently
-  drops any notification whose channel does not exist
-- Send the token with `POST /auth/logout` so a handset stops receiving the
-  previous person's notifications
-- Route a tap using the `route` value in the payload: `clock`, `leave` or
-  `approvals`
+- **Asks for permission** at sign-in, not at first launch. Android 13+ requires
+  it explicitly; iOS always asks; refusing registers nothing, because a token
+  the OS will never deliver to is a row that fails forever.
+- **Registers with `POST /api/v1/devices`** after login *and* after every
+  session restore — the OS reissues tokens on its own schedule, and a handset
+  the server can no longer reach looks exactly like one that never registered.
+- **Re-registers on `onTokenRefresh`**, which is the case that actually breaks
+  push in the field.
+- **Creates the `hrms_default` channel** natively in `MainActivity.kt`. Android
+  8+ drops a notification naming a channel that does not exist, in silence, and
+  the FCM send still reports success. The id must match `FCM_ANDROID_CHANNEL`.
+- **Sends the token with `POST /auth/logout`**, so a shared work phone stops
+  showing the previous person's leave decisions. No screen has to remember
+  this — `session.logout()` reads the token itself.
+- **Routes a tap** on the payload's `route` key (`clock`, `leave`, `approvals`)
+  to the matching tab, including a tap that launched the app from cold, where
+  the route has to wait as a value because no screen exists yet to receive an
+  event.
+- **Shows a snack bar** for a notification that arrives with the app already
+  open, since the OS shows nothing in that state.
 
-The server sends `route` in every push precisely so the app can do that last
-part without parsing message text.
+There is deliberately **no background message handler**. The server sends a
+`notification` block with every push, so the OS draws it while the app is
+backgrounded or dead; a Dart isolate woken per message would do nothing but
+cost battery.
+
+`android/app/build.gradle.kts` applies the google-services plugin **only if
+`google-services.json` is present**. Applying it unconditionally fails the build
+outright when the file is missing, which would make a Firebase project a
+prerequisite for compiling an attendance app. Drop the file in and the next
+build picks it up with no edit.
+
+### The one iOS step that cannot be scripted
+
+Xcode has to add the **Push Notifications** capability to the Runner target — it
+writes an entitlements file and registers an App ID, and both need a signed-in
+Apple Developer account. Open `mobile/ios/Runner.xcworkspace` → Runner →
+Signing & Capabilities → **+ Capability** → Push Notifications. Without it iOS
+never registers for remote notifications and `getToken()` returns null forever.
+
+Android needs no equivalent step.

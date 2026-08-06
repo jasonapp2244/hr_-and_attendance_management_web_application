@@ -113,12 +113,22 @@ Say data is encrypted in transit (yes), and that users can request deletion
 > together. An app that starts collecting location without updating its
 > declaration is the single most common cause of an enforcement removal.
 
-### 6. Notification permission — only when push is wired
+### 6. Notification permission — wired
 
-`POST_NOTIFICATIONS` is declared, but nothing requests it at runtime and
-Firebase is never initialised, so no notification can appear. That is consistent
-today. When B5 is built, the app must request the permission explicitly on
-Android 13+ and the data-safety form must be revisited.
+`POST_NOTIFICATIONS` is declared and the app now requests it at runtime, at
+sign-in rather than at first launch, so the prompt arrives with a reason
+visible. Android 13+ requires that explicit request; below 13 it is granted on
+install.
+
+Whether a notification can actually appear depends on the build: without
+`google-services.json` Firebase does not initialise, nothing is registered and
+nothing arrives. Both states are consistent with the declaration — the
+permission may be asked for and unused.
+
+**Before submitting a build that has the Firebase config in it**, revisit the
+data-safety form: an FCM token is a device identifier, and both stores treat
+"registers a push token" as data collection even when the notifications
+themselves carry no personal data.
 
 ---
 

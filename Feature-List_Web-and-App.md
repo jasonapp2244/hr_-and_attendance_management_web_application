@@ -20,7 +20,7 @@
 | A1.3 | Granular permissions per role (18 seeded) | ✅ |
 | A1.4 | Roles & permissions editor UI | ✅ |
 | A1.5 | Profile page + change password | ✅ |
-| A1.6 | Password reset via email ("forgot password") | ⬜ |
+| A1.6 | Password reset via email ("forgot password") | ✅ request → emailed link → new password; revokes app tokens and push. Needs a real `MAIL_MAILER` to leave the box |
 | A1.7 | Two-factor authentication (2FA) for Admin/HR | ⬜ |
 | A1.8 | Login activity & audit trail (who did what, when) | ⬜ |
 | A1.9 | Session timeout + forced re-login policy | ⬜ |
@@ -47,7 +47,7 @@
 | A3.3 | Employment details (code, job title, hire date, status) | ✅ |
 | A3.4 | Work mode — office / WFH / hybrid | ✅ |
 | A3.5 | Login credential creation & reset | ✅ |
-| A3.6 | CSV / Excel bulk import | ✅ |
+| A3.6 | CSV / Excel bulk import | ✅ 11 columns incl. office/department/designation/manager, matched by name; whole file validated before anything is written, every problem reported at once; department required because it carries the shift; template download |
 | A3.7 | Employee profile photo upload | ⬜ |
 | A3.8 | Document vault (contract, ID, certificates) with expiry alerts | ⬜ |
 | A3.9 | Emergency contact & personal details | ⬜ |
@@ -156,8 +156,8 @@ absence against working days only. Weekends and company holidays count as neithe
 # PART B — MOBILE APP (Android + iOS, Employee-facing)
 
 > Every screen below consumes the shared Laravel API (Part C), which is complete.
-> The app lives in `mobile/` — Flutter, eight screens, tested with 13 unit tests
-> and 10 integration tests driven against a stubbed API.
+> The app lives in `mobile/` — Flutter, nine screens, tested with 35 unit tests
+> and 10 integration tests driven against a live server.
 
 ## B1. Onboarding & Auth
 | # | Feature | Status |
@@ -165,7 +165,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B1.1 | Splash + branded onboarding screens | 🟡 splash holds while the token is verified; no onboarding carousel |
 | B1.2 | Login with email + password (Sanctum token) | ✅ |
 | B1.3 | Biometric unlock (fingerprint / Face ID) | ⬜ |
-| B1.4 | Forgot password flow | ⬜ blocked on A1.6 — no server-side reset exists |
+| B1.4 | Forgot password flow | ✅ app requests the link; the link opens the web reset page, not a token screen in the app |
 | B1.5 | Stay-logged-in / secure token refresh | ✅ token in the device keystore, re-verified against `/auth/me` at launch |
 | B1.6 | Device registration & binding (one account ↔ trusted device) | ⬜ |
 | B1.7 | Logout / remote session revoke | ✅ sign out, and sign out everywhere for a lost handset |
@@ -175,7 +175,7 @@ absence against working days only. Weekends and company holidays count as neithe
 |---|---|---|
 | B2.1 | Big one-tap Check In / Check Out button | ✅ double-tap reads as success, not as an error |
 | B2.2 | Live status card (checked in at 09:02, hours so far) | ✅ ticks locally between refreshes |
-| B2.3 | GPS capture at punch | ⬜ **no location plugin wired — app punches carry no coordinates** |
+| B2.3 | GPS capture at punch | ✅ `geolocator`, permission asked at the first punch; no fix, no permission or no signal sends the punch without coordinates |
 | B2.4 | Offline punch queue → auto-sync when back online | ⬜ |
 | B2.5 | Geofence-aware punch (warn or block outside office) | ⬜ optional |
 | B2.6 | Break in / break out | ⬜ needs A4.15 first |
@@ -206,19 +206,25 @@ absence against working days only. Weekends and company holidays count as neithe
 
 ## B5. Push Notifications (FCM / APNs)
 
-> **Server side is done (C1.15); the app side is untouched.** `firebase_core` and
-> `firebase_messaging` are in `pubspec.yaml` but never initialised, there is no
-> `google-services.json`, and the app never calls `POST /devices`. Until that is
-> wired, nothing below can arrive — and sign-out leaves a handset subscribed.
+> **Both halves are now built.** The app asks for permission at sign-in,
+> registers with `POST /devices`, re-registers when the OS reissues the token,
+> creates the `hrms_default` channel Android drops notifications without, sends
+> the token back on sign-out, and routes a tap — including one that launched the
+> app from cold — to the tab named by the payload's `route` key.
+>
+> It is silent until somebody creates the Firebase project: no
+> `google-services.json` means no push, and the app builds and runs exactly as
+> before rather than failing. That console work, and the one Xcode capability
+> iOS needs, are the whole of what is left — see `Push-Notifications_Setup.md`.
 
 | # | Feature | Status |
 |---|---|---|
 | B5.1 | Clock-in reminder at shift start | ⬜ no server job either |
-| B5.2 | Clock-out reminder at shift end | ⬜ server sends it; no handset registered to receive it |
-| B5.3 | Leave approved / rejected | ⬜ server sends it; no handset registered to receive it |
+| B5.2 | Clock-out reminder at shift end | ✅ end to end; needs credentials to leave the box |
+| B5.3 | Leave approved / rejected | ✅ end to end, both stages of the approval chain |
 | B5.4 | Schedule / roster updated | ⬜ needs A9.5 |
 | B5.5 | HR announcements & broadcasts | ⬜ |
-| B5.6 | In-app notification centre | ⬜ |
+| B5.6 | In-app notification centre | 🟡 a snack bar for a message arriving with the app open; no history |
 
 ## B6. App Experience
 | # | Feature | Status |
@@ -243,7 +249,24 @@ roster, profile and password, the full leave round-trip — balances, apply, tra
 withdraw — and the manager's tab: an approval inbox and who on the team is in today.
 The manager tab is drawn from the signed-in user's permissions, not hardcoded.*
 
-*Not built: push on the handset, GPS at punch, biometrics, and anything offline.*
+*GPS now travels with a punch. It is a record and never a gate: the app asks for
+"while in use" at the first punch, and services off, a refusal, a sensor that
+returns nonsense or no fix inside eight seconds all send the punch without
+coordinates rather than failing it. Nothing runs in the background, which is what
+the privacy policy already promised.*
+
+*Forgotten passwords are the app's own now rather than a note telling people to
+ask HR — which never helped the one account HR cannot reset, the administrator's.
+The app asks for the link; the link opens the web page, because a reset has to
+work from a borrowed laptop when the handset is the thing you are locked out of.*
+
+*Push now works on the handset. Registration is a consequence of signing in and
+is withdrawn on signing out, which is what stops a shared work phone showing the
+previous person's leave decisions; a tap opens the tab the notification is about
+rather than just the app. It stays silent until a Firebase project exists, and
+the app is entirely usable in that state.*
+
+*Not built: biometrics, and anything offline.*
 
 ---
 
@@ -261,12 +284,13 @@ The manager tab is drawn from the signed-in user's permissions, not hardcoded.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 481 tests covering attendance, leave, roster, swaps, the API, the audit trail, push, backups and preflight |
+| C1.11 | Automated test suite (feature + unit) | ✅ 523 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import and preflight |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `hrms:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
 | C1.15 | Push delivery to handsets (FCM v1) | ✅ channel alongside database and mail; silent until a service-account key is configured; deletes handsets FCM reports UNREGISTERED, keeps ones that merely 503'd |
 | C1.16 | Public privacy policy + account-deletion pages | ✅ no login required — both stores demand it before an app with accounts is listed |
+| C1.17 | Real-install setup, no demo data | ✅ `hrms:install` creates the company and first admin, or attaches an admin to an existing company (`--company-id`); validated timezone, roles seeded, one transaction. `db:seed` now makes roles only. `hrms:purge-demo --dry-run` clears a seeded database and names the real rows the cascade would take with it |
 
 ---
 
@@ -293,8 +317,8 @@ The manager tab is drawn from the signed-in user's permissions, not hardcoded.*
 | **Stage 2** | A6 — Leave Management (web) | ✅ Done — no accrual engine, no calendar view |
 | **Stage 3** | A9 + C1.9 — Notifications + scheduler | ✅ Built — `MAIL_MAILER` is still `log`, so no mail leaves the box |
 | **Stage 4** | A5.5–A5.9 — finish Shift & Schedule | ✅ Done — planner is a grid, not drag-and-drop |
-| **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | 🟡 **In progress — the screens work; GPS and biometrics are missing** |
-| **Stage 6** | B4–B5 — Leave + push in app | 🟡 Leave is done. Push: server sends, app cannot receive |
+| **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | 🟡 **In progress — the screens work and punches now carry GPS; biometrics and offline are missing** |
+| **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code |
 | **Stage 7** | A4.12–A4.19, A7.10–A7.14 | ⬜ Attendance depth + payroll-ready reporting |
 | **Stage 8** | D1 — AI HR Assistant | ⬜ Needs mature data across attendance + leave |
 
@@ -311,14 +335,14 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 55 | 10 | 29 | 94 |
-| Mobile App (B) | 15 | 4 | 25 | 44 |
-| Backend / API (C) | 14 | 2 | 0 | 16 |
+| Web Dashboard (A) | 56 | 10 | 28 | 94 |
+| Mobile App (B) | 19 | 5 | 20 | 44 |
+| Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **84** | **16** | **61** | **161** |
+| **Total** | **90** | **17** | **55** | **162** |
 
 ---
 
-*Updated 2026-08-04 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-08-06 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*

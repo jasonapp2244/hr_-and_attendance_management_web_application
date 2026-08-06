@@ -99,10 +99,10 @@
       platform, front-end assets, network services and licences. Compiled by direct inspection of the codebase, not from
       documentation.</p>
     <div class="meta-row">
-      <span class="meta">130 software packages</span>
+      <span class="meta">131 software packages</span>
       <span class="meta">1 live network dependency</span>
       <span class="meta">0 paid services in use</span>
-      <span class="meta">Verified 29 Jul 2026</span>
+      <span class="meta">Verified 29 Jul 2026 · revised 6 Aug 2026</span>
     </div>
   </div>
 </header>
@@ -139,14 +139,14 @@
     design template, covered in §12.3.</p>
 
   <div class="stats">
-    <div class="stat"><div class="n">6</div><div class="l">Libraries chosen directly</div></div>
-    <div class="stat"><div class="n">130</div><div class="l">Packages installed in total</div></div>
+    <div class="stat"><div class="n">7</div><div class="l">Libraries chosen directly</div></div>
+    <div class="stat"><div class="n">131</div><div class="l">Packages installed in total</div></div>
     <div class="stat"><div class="n">1</div><div class="l">Live external call</div></div>
     <div class="stat"><div class="n">$0</div><div class="l">Recurring licence cost</div></div>
   </div>
 
-  <p>The 130 figure sounds large and always alarms non-technical readers, so it is worth explaining once: the team chose
-    <b>7</b> libraries. Those 7 libraries each depend on others, which depend on others again. All 130 arrive
+  <p>The 131 figure sounds large and always alarms non-technical readers, so it is worth explaining once: the team chose
+    <b>7</b> libraries. Those 7 libraries each depend on others, which depend on others again. All 131 arrive
     automatically from a single command and are pinned to exact versions in a lock file, so every environment installs
     an identical set. This is normal and is how every modern PHP, Java, .NET or JavaScript project works.</p>
 
@@ -158,9 +158,10 @@
   </div>
 
   <div class="note warn">
-    <b>Three things do need a decision.</b> A web font is being fetched from Google on every page load (§9.2); a QR
-    library is installed but no longer used and should be removed (§13.1); and the admin interface is built on a
-    purchased commercial template whose licence must be confirmed as held by the company (§12.3).
+    <b>Two things do need a decision.</b> A web font is being fetched from Google on every page load (§9.2); and the
+    admin interface is built on a purchased commercial template whose licence must be confirmed as held by the
+    company (§12.3). The third — an unused QR library — was resolved on 6 August 2026 and is recorded as closed
+    at §13.1.
   </div>
 </section>
 
@@ -258,19 +259,16 @@
         <td>Administrative console for support tasks. No effect on the running application.</td>
         <td>MIT</td><td><span class="badge b-low">Support tool</span></td>
       </tr>
-      <tr>
-        <td><code>endroid/qr-code</code></td><td>6.0.9</td>
-        <td>QR code generation. <b>No longer used anywhere</b> — left behind when the QR kiosk approach was withdrawn in favour of GPS check-in.</td>
-        <td>MIT</td><td><span class="badge b-med">Remove</span></td>
-      </tr>
     </tbody>
   </table>
   </div>
 
-  <div class="note warn">
-    <b>Six, not seven.</b> The dependency file lists seven entries but one of them is <code>php</code> itself, which is
-    a version constraint rather than a library. The genuine count of chosen libraries is six, and one of those six
-    (<code>endroid/qr-code</code>) is dead weight that should be removed — see §13.1.
+  <div class="note ok">
+    <b>Seven, not eight.</b> The dependency file lists eight entries but one of them is <code>php</code> itself,
+    which is a version constraint rather than a library. The genuine count of chosen libraries is seven, and every
+    one of them is now in use — <code>endroid/qr-code</code>, listed here in earlier editions as dead weight,
+    <b>was removed on 6 August 2026</b>, taking its own dependency <code>bacon/bacon-qr-code</code> with it. It was
+    a leftover from the QR kiosk design, withdrawn in favour of one-tap GPS check-in. Finding 13.1 is closed.
   </div>
 </section>
 
@@ -346,7 +344,7 @@
   </div>
 
   <div class="note">
-    <b>Version control.</b> Exact versions of all 130 packages are recorded in <code>composer.lock</code>, which is
+    <b>Version control.</b> Exact versions of all 131 packages are recorded in <code>composer.lock</code>, which is
     committed to the repository. A deployment six months from now installs precisely the versions tested today — an
     upstream release cannot silently alter behaviour on the live system.
   </div>
@@ -626,9 +624,9 @@
     <tbody>
       <tr>
         <td>13.1</td>
-        <td><code>endroid/qr-code</code> is installed but referenced nowhere in the codebase — a leftover from the withdrawn QR kiosk design.</td>
-        <td>Remove it. Reduces the installed footprint and removes a component nobody is watching for security advisories.</td>
-        <td class="eff">15 min</td><td><span class="badge b-med">Housekeeping</span></td>
+        <td><s><code>endroid/qr-code</code> is installed but referenced nowhere in the codebase — a leftover from the withdrawn QR kiosk design.</s> <b>Closed 6 August 2026.</b></td>
+        <td>Removed, along with <code>bacon/bacon-qr-code</code> and the unreferenced 375 KB <code>html5-qrcode.min.js</code> scanner library in <code>public/assets/js/</code>. Full suite green afterwards (523 tests).</td>
+        <td class="eff">Done</td><td><span class="badge b-done">Resolved</span></td>
       </tr>
       <tr>
         <td>13.2</td>
@@ -656,7 +654,7 @@
       </tr>
       <tr>
         <td>13.6</td>
-        <td>No automated check exists for security advisories against the 130 installed packages.</td>
+        <td>No automated check exists for security advisories against the 131 installed packages.</td>
         <td>Add <code>composer audit</code> to the release routine — it is built in and free.</td>
         <td class="eff">1 hour</td><td><span class="badge b-high">Recommended</span></td>
       </tr>

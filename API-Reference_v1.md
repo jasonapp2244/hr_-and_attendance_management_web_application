@@ -167,6 +167,40 @@ wrong would tell an attacker which addresses exist.
 **Failures:** `invalid_credentials` (401) · `account_disabled` (403) ·
 `validation_failed` (422) · `too_many_requests` (429)
 
+### `POST /auth/forgot-password`
+
+Starts a password reset. **No token required** — somebody who could authenticate
+would not need this.
+
+| Field | Type | Notes |
+|---|---|---|
+| `email` | string, required, email | The address the person signs in with. |
+
+```json
+{
+  "ok": true,
+  "message": "If that email address has an account, a reset link is on its way."
+}
+```
+
+**The answer is the same whatever happened** — address unknown, account
+deactivated, or a link already sent a moment ago all return this. Do not try to
+branch on it: there is nothing to branch on, by design. For an HR system the
+staff list is exactly what an attacker is after, and a form that says "no such
+user" is a way to enumerate it.
+
+The link in the email opens the **web** reset page. The app's part of the flow
+ends with this call — do not build a token entry screen. A reset has to work
+from a borrowed laptop, because the phone is often the thing the person has lost
+access to.
+
+Completing a reset **revokes every API token and push registration** for that
+account, so a handset that was signed in will get `unauthenticated` on its next
+call and must send the person back to the login screen.
+
+**Failures:** `validation_failed` (422) · `too_many_requests` (429, the `login`
+limiter — 5/minute)
+
 ### `GET /auth/me`
 
 The payload above, for a client restoring a session on launch. Call it at
