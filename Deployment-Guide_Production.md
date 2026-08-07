@@ -328,6 +328,23 @@ it writes to the same machine. A server that dies takes its backups with it, so
 copy `/var/backups/hrms` off-box nightly — object storage, or `rsync` to another
 host.
 
+**The database dump is not the whole backup.** Uploaded files live on disk, not
+in MySQL, and a restored database with no files behind it is a list of documents
+that all 404:
+
+- `storage/app/employee-documents/` — contracts, ID scans, right-to-work papers.
+  Private, served only through the app. Losing these is a compliance problem,
+  not an inconvenience.
+- `storage/app/public/avatars/` — employee photos.
+
+Back both up with the database dump, on the same schedule, to the same off-box
+location. Restoring one without the other leaves the system quietly wrong.
+
+**`public/storage` must exist.** The deploy script runs `storage:link`, but if
+the symlink is ever lost every employee photo 404s with nothing in the log and
+no error on screen — the pictures simply stop appearing. `hrms:preflight` checks
+for it.
+
 **Watch these:**
 
 ```bash
