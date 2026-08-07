@@ -4,7 +4,7 @@
 **Unblocks:** the Flutter mobile app, which cannot be built against a laptop.
 
 Everything here is done once, on the server. Afterwards a new revision ships
-with `./deploy/deploy.sh` and nothing else.
+with `sudo bash deploy/deploy.sh` and nothing else.
 
 ---
 
@@ -338,12 +338,36 @@ reachable privacy policy, checked while signed out.
 
 ```bash
 cd /var/www/hrms-repo
-sudo -u www-data ./deploy/deploy.sh
+sudo bash deploy/deploy.sh
 ```
 
 It takes a verified backup before migrating, puts the site in maintenance mode,
-pulls, installs, migrates, rebuilds caches, restarts the worker and runs
-preflight — and brings the site back up even if a step fails.
+fast-forwards, installs, migrates, rebuilds caches, relinks storage, restarts the
+worker, hands the files back to the web user and runs preflight — and brings the
+site back up even if a step fails.
+
+Nothing touches the database until the new code is on disk: the backup is taken
+first, and a `mysqldump` that did not finish stops the deploy rather than being
+trusted.
+
+**It works out where it is.** The repository root and the application are the same
+directory on the layout above, but on a panel host the site sits at `<domain>/` and
+the application at `<domain>/hrms`, because the web root has to point at
+`hrms/public`. Both are detected, so the command is the same either way. The file
+owner is read off the checkout rather than assumed to be `www-data` — deploying as
+root otherwise leaves root-owned caches that PHP-FPM cannot write, which shows up
+as a 500 with nothing in the log.
+
+**It refuses to run against a non-production install**, because guessing wrong
+means migrating the wrong database. For a genuine staging or demo box, say so:
+
+```bash
+sudo ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh
+```
+
+Preflight is then advisory rather than fatal — `MAIL_MAILER=log` and a demo panel
+are the point on a demo box, and failing on them would only teach people to skip
+the script.
 
 ---
 
