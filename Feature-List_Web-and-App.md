@@ -24,6 +24,7 @@
 | A1.7 | Two-factor authentication (2FA) for Admin/HR | ✅ TOTP, any authenticator app; secret encrypted at rest, 8 single-use recovery codes, optional company-wide requirement on Admin/HR. Setup is by typed key — no QR image yet |
 | A1.8 | Login activity & audit trail (who did what, when) | ✅ immutable log of sign-ins, failed attempts, lockouts, timeouts, password and settings changes; filterable by event, person, date and IP. Admin-only |
 | A1.9 | Session timeout + forced re-login policy | ✅ per-company idle timeout, off by default; resets on activity so long work is never interrupted, and a timeout is logged apart from a deliberate sign-out |
+| A1.10 | Rate limiting on the password form | ✅ five wrong passwords per address per source per minute, then refused with the wait remaining. Counted on email **and** IP, so one person's mistakes cannot lock out a colleague behind the same office address. Raises Laravel's `Lockout` event rather than a bare 429, so every lockout lands in the audit trail and on the Security panel |
 
 ## A2. Company & Organization Setup
 | # | Feature | Status |
@@ -42,11 +43,11 @@
 ## A3. Employee Management
 | # | Feature | Status |
 |---|---|---|
-| A3.1 | Employee CRUD + deactivate | ✅ |
+| A3.1 | Employee CRUD + deactivate | ✅ deleting anyone who has ever clocked in is refused — `attendance_logs` cascades, so it would take the hours a finished payroll was calculated from. They are set to Terminated instead; deletion stays for records typed in by mistake |
 | A3.2 | Assign department / office / designation | ✅ |
 | A3.3 | Employment details (code, job title, hire date, status) | ✅ |
 | A3.4 | Work mode — office / WFH / hybrid | ✅ |
-| A3.5 | Login credential creation & reset | ✅ |
+| A3.5 | Login credential creation & reset | ✅ **Sign-in Account** panel on the employee page: create the login, set or generate a password (shown once, never stored readable), reset it, change the role, disable and re-enable. An employee record and a login are separate rows, so adding somebody to the payroll deliberately does not give them one |
 | A3.6 | CSV / Excel bulk import | ✅ 11 columns incl. office/department/designation/manager, matched by name; whole file validated before anything is written, every problem reported at once; department required because it carries the shift; template download |
 | A3.7 | Employee profile photo upload | ✅ JPG/PNG/WebP up to 2 MB; replacing one deletes the old file, and saving without one keeps what is there |
 | A3.8 | Document vault (contract, ID, certificates) with expiry alerts | ✅ seven document types, held on the private disk and streamed through the app — never a public URL. Anything with an expiry date is chased to HR 30 days out, once per document, and deleting an employee takes their files with them |

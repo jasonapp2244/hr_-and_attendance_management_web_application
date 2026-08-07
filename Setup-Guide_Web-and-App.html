@@ -377,9 +377,10 @@ php artisan view:cache</code></pre>
 ]);
 $u-&gt;assignRole('admin');</code></pre>
 
-    <div class="note warn">
-      <b>Front-end assets.</b> Run <code>npm install &amp;&amp; npm run build</code> on a build machine and upload the
-      resulting <code>public/build</code> folder. Node.js is not needed on the live server — only the compiled output.
+    <div class="note">
+      <b>No front-end build step.</b> The interface is served straight out of <code>public/assets</code>; there is no
+      Vite or Tailwind pipeline to run. Node.js is not needed on the live server or on a build machine &mdash;
+      deployment is PHP only.
     </div>
   </div>
 
@@ -682,10 +683,7 @@ php artisan tinker</code></pre>
   </div>
 
   <div class="note crit">
-    <b>Four known defects should be fixed before real payroll depends on this system.</b> They are in the existing code,
-    not in the setup: deleting an employee permanently destroys their attendance history; no soft deletes exist; new
-    employees cannot be given a login through the interface; and the login page has no rate limit. Approximately four
-    days of work, requiring no accounts, budget or approvals. See the audit for detail.
+    <b>One known defect remains before real payroll depends on this system.</b> Employee records still have no soft delete, so a deletion is permanent. The data-loss risk it carried has been closed &mdash; an employee with attendance history can no longer be deleted at all, because doing so used to cascade away every punch behind them; they are set to <b>Terminated</b> instead. Three of the four have been fixed: new employees can now be given a login from their own page, the password form is rate limited, and attendance history can no longer be destroyed by a deletion.
   </div>
 </section>
 
@@ -700,11 +698,11 @@ php artisan tinker</code></pre>
       <tr><td>Blank white page</td><td>Permissions or a fatal error</td><td><code>chmod -R 775 storage bootstrap/cache</code>, then read <code>storage/logs/laravel.log</code></td></tr>
       <tr><td>"500 Server Error" after deploying</td><td>Stale configuration cache</td><td><code>php artisan config:clear &amp;&amp; php artisan cache:clear</code></td></tr>
       <tr><td><b>Check-in does not record location</b></td><td>Site is not on HTTPS</td><td>Complete step A7 — browsers block GPS on plain HTTP</td></tr>
-      <tr><td>Employee cannot log in</td><td>No <code>User</code> record exists for them</td><td>Known defect — 5 of 10 existing employees have no login. Needs the code fix, not a setting change</td></tr>
+      <tr><td>Employee cannot log in</td><td>No sign-in account has been created for them</td><td>Open the employee, then <b>Sign-in Account &rarr; Create sign-in account</b>. An employee record and a login are separate things; adding somebody to the payroll does not give them one</td></tr>
       <tr><td>Email silently does nothing</td><td><code>MAIL_MAILER</code> still <code>log</code></td><td>Complete A8, then <code>php artisan config:clear</code></td></tr>
       <tr><td>Email sends but lands in spam</td><td>Missing SPF/DKIM</td><td>Add the DNS records in A8</td></tr>
-      <tr><td>Styles missing, page unformatted</td><td><code>public/build</code> not uploaded</td><td>Run <code>npm run build</code> and upload the output</td></tr>
-      <tr><td>Uploaded images do not display</td><td>Storage link missing</td><td><code>php artisan storage:link</code> — not yet created on this project</td></tr>
+      <tr><td>Styles missing, page unformatted</td><td><code>public/assets</code> missing or not readable</td><td>Re-upload <code>public/assets</code> and check the web user can read it &mdash; there is no build step to re-run</td></tr>
+      <tr><td>Uploaded images do not display</td><td>Storage link missing</td><td><code>php artisan storage:link</code>. <code>deploy.sh</code> runs it and <code>hrms:preflight</code> checks for it</td></tr>
       <tr><td>Wrong times on attendance</td><td><code>APP_TIMEZONE</code> incorrect</td><td>Set it, then <code>php artisan config:cache</code></td></tr>
       <tr><td>Routes 404 after an update</td><td>Stale route cache</td><td><code>php artisan route:clear &amp;&amp; php artisan route:cache</code></td></tr>
     </tbody>

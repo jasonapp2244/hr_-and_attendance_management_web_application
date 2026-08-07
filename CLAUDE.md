@@ -108,6 +108,20 @@ nothing. Log out explicitly, or build the fixture without authenticating.
 - **Attendance is append-only.** Edit and delete throw; punches are voided
   instead, and every write records actor, source, IP and a full snapshot.
   `ActivityLog` and `AttendanceAuditEvent` refuse updates and deletes too.
+  **Deleting an *employee* was the way around this**: `attendance_logs.employee_id`
+  is `ON DELETE CASCADE`, so removing somebody took every punch they ever made,
+  including the ones a finished payroll run was calculated from. Deletion now
+  refuses anyone with history and points at `status = terminated` instead.
+  Employees still have no soft delete, so the refusal is the only thing standing
+  between a mis-click and a hole in the audit trail — leave it in place.
+- **The login throttle fires `Lockout`, not a 429.** `LoginController` counts
+  attempts itself rather than wearing `throttle` middleware, because
+  `AppServiceProvider` already listens for Laravel's `Lockout` event and writes
+  the audit row that the Security panel's "Lockouts (24h)" tile counts. Route
+  middleware would block the requests and leave that tile reading zero straight
+  through an attack. The counter is keyed on **email *and* IP**: on email alone
+  one person's fat fingers would lock out a colleague behind the same office NAT
+  address; on IP alone the whole office shares one budget.
 - **Every new policy defaults to off.** `session_idle_timeout_minutes` (0),
   `enforce_geofence` (false), `require_two_factor_for_staff` (false). Each would
   otherwise change behaviour for a working installation on upgrade. They live in
@@ -144,6 +158,16 @@ manager holds the permission but not the role.
 **Every mobile API call needs an employee record.** `ApiController::employee()`
 aborts 403 "No employee record is linked to this account". A hand-created admin
 has no employee row, so it signs in and then 403s on nearly everything.
+
+**An employee record and a login are separate rows, deliberately** — plenty of
+staff are on the payroll and never touch the system. The link is
+`employees.user_id`, and it is made on the employee's own page under **Sign-in
+Account** (`EmployeeAccountController`). Which roles that screen offers depends
+on the viewer: `manage-employees` grants `employee` and `manager`, and the
+elevated `hr` and `admin` need `manage-roles`. Without that split HR — who hold
+`manage-employees`, because onboarding is their job — could mint an account,
+make it an admin and sign in as one. The same rule runs in reverse, so HR cannot
+demote an existing administrator either.
 
 ---
 
@@ -196,6 +220,12 @@ A restored database with no files behind it is a list of documents that all 404.
 **`public/storage` must exist.** Without the symlink every employee photo 404s
 with nothing in the log and no error on screen. `deploy.sh` runs `storage:link`
 and preflight checks for it.
+
+**There is no asset build step, deliberately.** The UI is the SmartHR Bootstrap 5
+template served straight out of `public/assets`; no view uses `@vite`. Laravel's
+default `package.json`, `vite.config.js`, `resources/js` and `resources/css` were
+scaffolding nothing imported, and were deleted so nobody deploys expecting an
+`npm ci && npm run build` that would produce nothing. Deployment is PHP only.
 
 ---
 
