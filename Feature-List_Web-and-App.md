@@ -48,11 +48,11 @@
 | A3.4 | Work mode — office / WFH / hybrid | ✅ |
 | A3.5 | Login credential creation & reset | ✅ |
 | A3.6 | CSV / Excel bulk import | ✅ 11 columns incl. office/department/designation/manager, matched by name; whole file validated before anything is written, every problem reported at once; department required because it carries the shift; template download |
-| A3.7 | Employee profile photo upload | ⬜ |
-| A3.8 | Document vault (contract, ID, certificates) with expiry alerts | ⬜ |
-| A3.9 | Emergency contact & personal details | ⬜ |
-| A3.10 | Org chart / reporting-manager hierarchy | 🟡 reporting line set + cycle-safe; no org chart view |
-| A3.11 | Employee export (CSV / Excel) | ⬜ |
+| A3.7 | Employee profile photo upload | ✅ JPG/PNG/WebP up to 2 MB; replacing one deletes the old file, and saving without one keeps what is there |
+| A3.8 | Document vault (contract, ID, certificates) with expiry alerts | ✅ seven document types, held on the private disk and streamed through the app — never a public URL. Anything with an expiry date is chased to HR 30 days out, once per document, and deleting an employee takes their files with them |
+| A3.9 | Emergency contact & personal details | ✅ contact name, phone and relationship, plus personal email, address, national ID and blood group |
+| A3.10 | Org chart / reporting-manager hierarchy | ✅ printable nested tree from one query; anybody whose manager has left shows at the top rather than vanishing |
+| A3.11 | Employee export (CSV / Excel) | ✅ same columns as the bulk import, in the same order, so an export can be edited and fed back in. Honours the filters on screen |
 | A3.12 | Onboarding & offboarding checklists | ⬜ |
 
 ## A4. Attendance Management *(core module)*
@@ -76,7 +76,7 @@
 | A4.16 | Geofence enforcement (block punch outside office radius) | ✅ off by default; exempts WFH/hybrid staff, offices with no coordinates, and punches that arrive without a location. Refusal names the distance |
 | A4.17 | Auto-absent marking for missed days (scheduled job) | 🟡 absence stays derived; nightly job refreshes the scores that count it |
 | A4.18 | Missing-checkout auto-close policy | ✅ closes at the scheduled shift end, marked `source: auto` |
-| A4.19 | Live "who's in right now" board | ⬜ |
+| A4.19 | Live "who's in right now" board | ✅ four buckets that partition the roster — on the clock (breaks flagged), been and gone, on approved leave, unaccounted for. Refreshes each minute, pauses when the tab is hidden |
 
 ## A5. Shift & Schedule Management
 | # | Feature | Status |
@@ -87,7 +87,7 @@
 | A5.4 | Shift-driven attendance validation | ✅ |
 | A5.5 | Per-employee shift override | ✅ |
 | A5.6 | Rotating / night shift patterns | ✅ |
-| A5.7 | Break rule configuration | 🟡 unpaid break deducted from paid hours; no break punches |
+| A5.7 | Break rule configuration | 🟡 unpaid break deducted from paid hours, and real break punches now override it (A4.15); no per-shift break policy builder |
 | A5.8 | Roster drag-and-drop planner + publish to staff | 🟡 grid planner + draft/publish; no drag-and-drop |
 | A5.9 | Shift swap requests between employees | ✅ |
 
@@ -97,12 +97,12 @@
 | A6.1 | Leave types (annual, sick, unpaid, casual…) | ✅ |
 | A6.2 | Leave request submission | ✅ |
 | A6.3 | Multi-step approval workflow (manager → HR) | ✅ |
-| A6.4 | Leave balance tracking & accrual rules | 🟡 tracked, provisioned & HR-adjustable; no automatic accrual |
+| A6.4 | Leave balance tracking & accrual rules | ✅ per-type: all at once, or a twelfth a month pro-rated from the hire date. The nightly job only ever raises a balance, so an HR adjustment is never undone |
 | A6.5 | Leave history & status management | ✅ |
 | A6.6 | Company leave policy configuration | 🟡 types + holidays + weekend config; no rules engine |
-| A6.7 | Team leave calendar / conflict detection | 🟡 conflicts flagged to the manager; no calendar view |
+| A6.7 | Team leave calendar / conflict detection | ✅ month grid, weekend- and holiday-aware, filterable by department. Pending is drawn alongside approved so cover is not granted twice onto one day |
 | A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ✅ |
-| A6.9 | Carry-forward & year-end processing | ⬜ |
+| A6.9 | Carry-forward & year-end processing | ✅ capped by the type (null uncapped, 0 off); an overdrawn balance starts at zero rather than in debt, and the roll is safe to run twice |
 
 *Built so far: leave types, the employee self-service screen (balances, apply, withdraw),
 weekend- and holiday-aware day counting, balance enforcement, the company-wide leave register
@@ -146,7 +146,7 @@ absence against working days only. Weekends and company holidays count as neithe
 |---|---|---|
 | A9.1 | In-app notification bell + centre | ✅ one inbox shared by the dashboard and the portal |
 | A9.2 | Email notifications | 🟡 leave emails queued and rendering; MAIL_MAILER still `log` |
-| A9.3 | Late-arrival alert to HR | ⬜ |
+| A9.3 | Late-arrival alert to HR | ✅ one digest a day naming everybody and how late they were — not an alert per person. Silent on a day with no lateness |
 | A9.4 | Leave request / approval / rejection alerts | ✅ routed by NotificationService, both stages |
 | A9.5 | Schedule update alerts | ⬜ |
 | A9.6 | Missing-checkout reminder | ✅ sent once, a configurable grace after the shift ends |
@@ -321,8 +321,8 @@ the app is entirely usable in that state.*
 | **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code |
 | **Stage 7** | A4.12–A4.15, A7.10–A7.14 | ✅ Attendance depth + reporting — correction, regularisation, overtime, break punches, payroll export, leave reports, scheduled delivery, report builder |
 | **Stage 8** | A1.7–A1.9, A2.3, A2.8, A4.16 | ✅ 2FA, the security trail, the idle timeout, the working-week editor and geofence enforcement |
-| **Stage 9** | A3.7–A3.12, A6.4/A6.6/A6.7/A6.9 | ⬜ Employee records and leave depth |
-| **Stage 10** | A8.4–A8.6, A9.3, A9.5 | ⬜ Dashboards and the remaining alerts |
+| **Stage 9** | A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3 | ✅ Photos, the document vault, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest |
+| **Stage 10** | A8.4–A8.6, A9.5, A4.11, A3.12 | ⬜ Role-specific dashboards, trends, schedule alerts, weekly rollups, on/offboarding checklists |
 | **Stage 11** | B7 — Manager mode in the app | ⬜ Team roster; approvals and team attendance already ship |
 | **Stage 12** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
 
@@ -339,15 +339,22 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 65 | 10 | 19 | 94 |
+| Web Dashboard (A) | 75 | 9 | 10 | 94 |
 | Mobile App (B) | 19 | 5 | 20 | 44 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **99** | **17** | **46** | **162** |
+| **Total** | **109** | **16** | **37** | **162** |
 
-The current push is **the web dashboard to completion, AI excluded**. Stage 8 is done;
-Stages 9 and 10 remain — 19 planned rows and 10 partial ones across Part A. The AI
-assistant (Part D) is deliberately out of scope.
+The current push is **the web dashboard to completion, AI excluded**. Stages 8 and 9 are
+done. Ten planned rows and nine partial ones remain in Part A, listed under Stage 10 —
+none of them blocks a production deployment. The AI assistant (Part D) is deliberately
+out of scope.
+
+**Still open, and worth being explicit about:** on/offboarding checklists (A3.12), weekly
+rollup summaries (A4.11), role-specific dashboards and trend widgets (A8.4–A8.6),
+schedule-change alerts (A9.5), multi-company tenancy (A2.10), a conditional rules engine
+(A2.9, A6.6), a drag-and-drop roster planner (A5.8), and a QR image on the 2FA setup
+screen — the key can be typed in, which every authenticator supports.
 
 ---
 
