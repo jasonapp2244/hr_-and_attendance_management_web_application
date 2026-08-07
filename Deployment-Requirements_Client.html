@@ -90,30 +90,29 @@
     </div>
     <div class="who">
       <b>Prepared for</b> Alfonzo<br>
-      <b>Date</b> 7 August 2026<br>
+      <b>Date</b> 8 August 2026<br>
       <b>Status</b> Software complete — awaiting infrastructure
     </div>
   </div>
 
   <div class="banner">
-    <b>The software is finished and tested.</b> The web dashboard, the mobile app and the
-    shared API are all built. What remains is not development — it is a server, a domain
-    and two service accounts. This page lists exactly what is needed, who provides each
-    item, and what it costs.
+    <b>The web dashboard is finished and tested.</b> What remains is not development — it is a
+      server, a domain and a mail account. This page lists exactly what is needed, who
+      provides each item, and what it costs.
   </div>
 
   <!-- ============================================================ -->
   <h2><span class="tag">1</span> What is already working</h2>
   <p class="lede">
-    Verified on 7 August 2026 by running the full automated suite and by driving every
+    Verified on 8 August 2026 by running the full automated suite and by driving every
     screen in a real browser as each of the four user roles.
   </p>
 
   <div class="grid">
-    <div class="stat"><div class="big">874</div><div class="lbl">Automated tests passing</div></div>
-    <div class="stat"><div class="big">117</div><div class="lbl">Features delivered</div></div>
+    <div class="stat"><div class="big">908</div><div class="lbl">Automated tests passing</div></div>
+    <div class="stat"><div class="big">88</div><div class="lbl">Dashboard features delivered</div></div>
     <div class="stat"><div class="big">4</div><div class="lbl">User roles, each verified</div></div>
-    <div class="stat"><div class="big">11 / 13</div><div class="lbl">Project phases complete</div></div>
+    <div class="stat"><div class="big">9 / 9</div><div class="lbl">Project phases complete</div></div>
   </div>
 
   <table>
@@ -164,13 +163,6 @@
             attendance change.</td>
         <td class="mid"><span class="pill ok">Live</span></td>
       </tr>
-      <tr>
-        <td><b>Mobile app</b></td>
-        <td>Android and iOS from one codebase: clock in/out with GPS, attendance history,
-            leave, roster, profile, and a manager mode with approvals, team attendance and
-            the team roster.</td>
-        <td class="mid"><span class="pill ok">Built</span></td>
-      </tr>
     </tbody>
   </table>
 
@@ -178,7 +170,7 @@
   <h2><span class="tag">2</span> What must be provided <small>— the actual blockers</small></h2>
   <p class="lede">
     Nothing below is development work. Each is an account or a purchase, and the system
-    cannot go live without the first four.
+    cannot go live without them.
   </p>
 
   <table>
@@ -195,9 +187,9 @@
       <tr>
         <td class="n">1</td>
         <td><b>Domain name</b></td>
-        <td>Staff need an address to sign in at, and the mobile app cannot connect to a
-            laptop. Both app stores also refuse a privacy-policy link that points at a
-            local machine.</td>
+        <td>Staff need an address to sign in at, and a certificate can only be issued for a
+            real domain. A privacy-policy link that points at a local machine is also of
+            no use to anyone.</td>
         <td>~$10–15 / year</td>
         <td class="mid"><span class="pill you">Client</span></td>
       </tr>
@@ -229,30 +221,6 @@
         <td>Free–$15 / month</td>
         <td class="mid"><span class="pill you">Client</span></td>
       </tr>
-      <tr>
-        <td class="n">5</td>
-        <td><b>Firebase project</b></td>
-        <td>Only for mobile push notifications. The app is fully usable without it — it
-            simply does not buzz. Needed before the app is published if push matters.</td>
-        <td>Free</td>
-        <td class="mid"><span class="pill opt">Optional</span></td>
-      </tr>
-      <tr>
-        <td class="n">6</td>
-        <td><b>Google Play account</b></td>
-        <td>Only if the Android app is to be published publicly rather than installed
-            directly. One-off fee.</td>
-        <td>$25 one-off</td>
-        <td class="mid"><span class="pill opt">Optional</span></td>
-      </tr>
-      <tr>
-        <td class="n">7</td>
-        <td><b>Apple Developer account</b></td>
-        <td>Only if the iPhone app is to be published. Also requires a Mac to build and
-            submit, which we do not currently have access to.</td>
-        <td>$99 / year</td>
-        <td class="mid"><span class="pill opt">Optional</span></td>
-      </tr>
     </tbody>
   </table>
 
@@ -262,9 +230,9 @@
   </p>
 
   <div class="banner warn">
-    <b>Minimum to go live on the web:</b> items 1, 2 and 4 — a domain, a small VPS and an
-    email account. Items 5–7 only matter if you are publishing the mobile app to the
-    stores; the web dashboard works fully without any of them.
+    <b>Minimum to go live:</b> items 1, 2 and 4 — a domain, a small VPS and an email
+    account. Item 3, the certificate, is free and issued by us once the domain points at
+    the server.
   </div>
 
   <!-- ============================================================ -->
@@ -327,8 +295,8 @@
               left on, email not really sending, the test sign-in panel still enabled,
               default passwords, a missing backup, or a wrong timezone.</td></tr>
       <tr><td class="n">8</td><td>Handover</td>
-          <td>Walk through the dashboard, confirm a real check-in from a phone, and hand
-              over the administrator account.</td></tr>
+          <td>Walk through the dashboard, confirm a real check-in, and hand over the
+              administrator account.</td></tr>
     </tbody>
   </table>
 
@@ -373,17 +341,12 @@
         <td>The roster planner is a grid you fill in, with draft and publish. It works;
             the dragging is cosmetic and was not built.</td>
       </tr>
-      <tr>
-        <td><b>iPhone App Store release</b></td>
-        <td>The iOS app is built and ready, but submitting it requires a Mac and an Apple
-            Developer account. Android has no such restriction.</td>
-      </tr>
     </tbody>
   </table>
 
   <div class="foot">
     <div>HR &amp; Attendance Management System — Deployment Requirements</div>
-    <div>Verified 7 August 2026 · 874 automated tests passing · Page 1 of 1</div>
+    <div>Verified 8 August 2026 · 908 automated tests passing · Page 1 of 1</div>
   </div>
 
 </div>

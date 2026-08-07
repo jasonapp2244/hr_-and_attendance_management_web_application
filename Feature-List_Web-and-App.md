@@ -285,7 +285,7 @@ the app is entirely usable in that state.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 523 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import and preflight |
+| C1.11 | Automated test suite (feature + unit) | ✅ 908 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import and preflight |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `hrms:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
