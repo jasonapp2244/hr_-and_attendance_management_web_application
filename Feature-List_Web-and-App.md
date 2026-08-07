@@ -21,22 +21,22 @@
 | A1.4 | Roles & permissions editor UI | ✅ |
 | A1.5 | Profile page + change password | ✅ |
 | A1.6 | Password reset via email ("forgot password") | ✅ request → emailed link → new password; revokes app tokens and push. Needs a real `MAIL_MAILER` to leave the box |
-| A1.7 | Two-factor authentication (2FA) for Admin/HR | ⬜ |
-| A1.8 | Login activity & audit trail (who did what, when) | ⬜ |
-| A1.9 | Session timeout + forced re-login policy | ⬜ |
+| A1.7 | Two-factor authentication (2FA) for Admin/HR | ✅ TOTP, any authenticator app; secret encrypted at rest, 8 single-use recovery codes, optional company-wide requirement on Admin/HR. Setup is by typed key — no QR image yet |
+| A1.8 | Login activity & audit trail (who did what, when) | ✅ immutable log of sign-ins, failed attempts, lockouts, timeouts, password and settings changes; filterable by event, person, date and IP. Admin-only |
+| A1.9 | Session timeout + forced re-login policy | ✅ per-company idle timeout, off by default; resets on activity so long work is never interrupted, and a timeout is logged apart from a deliberate sign-out |
 
 ## A2. Company & Organization Setup
 | # | Feature | Status |
 |---|---|---|
 | A2.1 | Company profile (name, logo, address, timezone) | ✅ |
 | A2.2 | Office / branch management | ✅ |
-| A2.3 | Office GPS coordinates + geofence radius | 🟡 stored, not enforced |
+| A2.3 | Office GPS coordinates + geofence radius | ✅ stored, and enforced when the company switches A4.16 on |
 | A2.4 | Departments — CRUD & assignment | ✅ |
 | A2.5 | Designations / job titles | ✅ |
 | A2.6 | General settings page | ✅ |
 | A2.7 | Company holiday calendar | ✅ |
-| A2.8 | Weekend / working-days configuration per office | 🟡 company-level setting; no UI |
-| A2.9 | Attendance & leave policy rules engine | ⬜ |
+| A2.8 | Weekend / working-days configuration per office | ✅ editable working week, company-level — the same definition leave charging, absence and the roster all read. A seven-day week is expressible; a zero-day one is refused |
+| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout — but there is no conditional rule builder |
 | A2.10 | Multi-company (SaaS tenancy) support | ⬜ |
 
 ## A3. Employee Management
@@ -69,11 +69,11 @@
 | A4.9 | Daily summary (present / late / on leave / absent / headcount) | ✅ |
 | A4.10 | Monthly attendance scoring (on-time %, late count) | ✅ |
 | A4.11 | Weekly rollup summaries | ⬜ |
-| A4.12 | Manual attendance entry / correction by HR (with audit reason) | ⬜ |
-| A4.13 | Attendance regularisation requests (employee raises, HR approves) | ⬜ |
-| A4.14 | Overtime calculation & tracking | ⬜ |
-| A4.15 | Break in / break out punches | ⬜ |
-| A4.16 | Geofence enforcement (block punch outside office radius) | ⬜ optional |
+| A4.12 | Manual attendance entry / correction by HR (with audit reason) | ✅ |
+| A4.13 | Attendance regularisation requests (employee raises, HR approves) | ✅ |
+| A4.14 | Overtime calculation & tracking | ✅ |
+| A4.15 | Break in / break out punches | ✅ |
+| A4.16 | Geofence enforcement (block punch outside office radius) | ✅ off by default; exempts WFH/hybrid staff, offices with no coordinates, and punches that arrive without a location. Refusal names the distance |
 | A4.17 | Auto-absent marking for missed days (scheduled job) | 🟡 absence stays derived; nightly job refreshes the scores that count it |
 | A4.18 | Missing-checkout auto-close policy | ✅ closes at the scheduled shift end, marked `source: auto` |
 | A4.19 | Live "who's in right now" board | ⬜ |
@@ -125,11 +125,11 @@ absence against working days only. Weekends and company holidays count as neithe
 | A7.7 | Historical attendance analysis | ✅ |
 | A7.8 | Company adherence overview | ✅ |
 | A7.9 | Location & IP columns in exports | ✅ |
-| A7.10 | Leave reports | ⬜ |
-| A7.11 | Overtime reports | ⬜ |
-| A7.12 | Scheduled report email delivery (daily/weekly/monthly) | ⬜ |
-| A7.13 | Custom report builder (pick columns + filters) | ⬜ |
-| A7.14 | Payroll-ready export (hours worked per employee per period) | ⬜ |
+| A7.10 | Leave reports | ✅ days taken per employee split by the company's own leave types, pending days separately, and the year's unspent entitlement |
+| A7.11 | Overtime reports | ✅ |
+| A7.12 | Scheduled report email delivery (daily/weekly/monthly) | ✅ standing orders with a PDF or Excel attachment, sent at 07:00 in the company's timezone; recipients need no login; "Send Now" to test one. Needs a real `MAIL_MAILER` to leave the box |
+| A7.13 | Custom report builder (pick columns + filters) | ✅ 18 columns over three groups, filtered by office, department, work mode and period; exports to PDF and Excel like the fixed reports |
+| A7.14 | Payroll-ready export (hours worked per employee per period) | ✅ |
 
 ## A8. Dashboard
 | # | Feature | Status |
@@ -319,8 +319,12 @@ the app is entirely usable in that state.*
 | **Stage 4** | A5.5–A5.9 — finish Shift & Schedule | ✅ Done — planner is a grid, not drag-and-drop |
 | **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | 🟡 **In progress — the screens work and punches now carry GPS; biometrics and offline are missing** |
 | **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code |
-| **Stage 7** | A4.12–A4.19, A7.10–A7.14 | ⬜ Attendance depth + payroll-ready reporting |
-| **Stage 8** | D1 — AI HR Assistant | ⬜ Needs mature data across attendance + leave |
+| **Stage 7** | A4.12–A4.15, A7.10–A7.14 | ✅ Attendance depth + reporting — correction, regularisation, overtime, break punches, payroll export, leave reports, scheduled delivery, report builder |
+| **Stage 8** | A1.7–A1.9, A2.3, A2.8, A4.16 | ✅ 2FA, the security trail, the idle timeout, the working-week editor and geofence enforcement |
+| **Stage 9** | A3.7–A3.12, A6.4/A6.6/A6.7/A6.9 | ⬜ Employee records and leave depth |
+| **Stage 10** | A8.4–A8.6, A9.3, A9.5 | ⬜ Dashboards and the remaining alerts |
+| **Stage 11** | B7 — Manager mode in the app | ⬜ Team roster; approvals and team attendance already ship |
+| **Stage 12** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
 
 ### The one thing gating the rest
 
@@ -335,14 +339,18 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 56 | 10 | 28 | 94 |
+| Web Dashboard (A) | 65 | 10 | 19 | 94 |
 | Mobile App (B) | 19 | 5 | 20 | 44 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **90** | **17** | **55** | **162** |
+| **Total** | **99** | **17** | **46** | **162** |
+
+The current push is **the web dashboard to completion, AI excluded**. Stage 8 is done;
+Stages 9 and 10 remain — 19 planned rows and 10 partial ones across Part A. The AI
+assistant (Part D) is deliberately out of scope.
 
 ---
 
-*Updated 2026-08-06 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-08-07 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
