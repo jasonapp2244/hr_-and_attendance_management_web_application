@@ -53,7 +53,7 @@
 | A3.9 | Emergency contact & personal details | ✅ contact name, phone and relationship, plus personal email, address, national ID and blood group |
 | A3.10 | Org chart / reporting-manager hierarchy | ✅ printable nested tree from one query; anybody whose manager has left shows at the top rather than vanishing |
 | A3.11 | Employee export (CSV / Excel) | ✅ same columns as the bulk import, in the same order, so an export can be edited and fed back in. Honours the filters on screen |
-| A3.12 | Onboarding & offboarding checklists | ⬜ |
+| A3.12 | Onboarding & offboarding checklists | ✅ company-standard steps with an owner and a due offset; raising a list **copies** them onto the person, so editing a template never rewrites history and deleting one leaves finished checklists intact. Every tick records who and when |
 
 ## A4. Attendance Management *(core module)*
 | # | Feature | Status |
@@ -68,7 +68,7 @@
 | A4.8 | Late / early-leave status vs assigned shift | ✅ |
 | A4.9 | Daily summary (present / late / on leave / absent / headcount) | ✅ |
 | A4.10 | Monthly attendance scoring (on-time %, late count) | ✅ |
-| A4.11 | Weekly rollup summaries | ⬜ |
+| A4.11 | Weekly rollup summaries | ✅ one row per week — present, leave, absent, late, on-time % and attendance %. Weeks are clipped to the window so a short first week is reported as short. Schedulable by email |
 | A4.12 | Manual attendance entry / correction by HR (with audit reason) | ✅ |
 | A4.13 | Attendance regularisation requests (employee raises, HR approves) | ✅ |
 | A4.14 | Overtime calculation & tracking | ✅ |
@@ -137,9 +137,9 @@ absence against working days only. Weekends and company holidays count as neithe
 | A8.1 | Live tiles — present, late, absent, headcount | ✅ |
 | A8.2 | Recent attendance feed | ✅ |
 | A8.3 | Charts / visualisation | ✅ |
-| A8.4 | Role-specific dashboards (Admin vs HR view) | ⬜ |
-| A8.5 | Configurable widgets | ⬜ |
-| A8.6 | Trend comparison (this week vs last week) | ⬜ |
+| A8.4 | Role-specific dashboards (Admin vs HR view) | ✅ admin opens on security and the trail; HR on approvals and expiring documents |
+| A8.5 | Configurable widgets | ✅ eight panels, chosen per user rather than per role; a panel the viewer lacks permission for is never shown, never offered and cannot be saved. A hidden panel costs no queries |
+| A8.6 | Trend comparison (this week vs last week) | ✅ like for like — both windows run Monday to the same weekday, so a Tuesday is compared with a Tuesday rather than a finished week |
 
 ## A9. Notifications (Web)
 | # | Feature | Status |
@@ -148,7 +148,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | A9.2 | Email notifications | 🟡 leave emails queued and rendering; MAIL_MAILER still `log` |
 | A9.3 | Late-arrival alert to HR | ✅ one digest a day naming everybody and how late they were — not an alert per person. Silent on a day with no lateness |
 | A9.4 | Leave request / approval / rejection alerts | ✅ routed by NotificationService, both stages |
-| A9.5 | Schedule update alerts | ⬜ |
+| A9.5 | Schedule update alerts | ✅ publishing a roster tells each affected employee once, covering the whole range rather than one message per day. In-app, email and push |
 | A9.6 | Missing-checkout reminder | ✅ sent once, a configurable grace after the shift ends |
 
 ---
@@ -241,7 +241,7 @@ absence against working days only. Weekends and company holidays count as neithe
 |---|---|---|
 | B7.1 | Team attendance today | ✅ present vs in-now reported separately |
 | B7.2 | Approve leave / regularisation from phone | ✅ leave only — regularisation needs A4.13 |
-| B7.3 | Team roster view | ⬜ |
+| B7.3 | Team roster view | ✅ `GET /team/roster` plus a Roster tab in the app — a week per direct report, published days only, with leave outranking a rostered shift |
 
 *Built so far: sign-in with the token held in the device keystore, the clock screen
 with its live worked-hours card, attendance history with totals, the published
@@ -322,8 +322,8 @@ the app is entirely usable in that state.*
 | **Stage 7** | A4.12–A4.15, A7.10–A7.14 | ✅ Attendance depth + reporting — correction, regularisation, overtime, break punches, payroll export, leave reports, scheduled delivery, report builder |
 | **Stage 8** | A1.7–A1.9, A2.3, A2.8, A4.16 | ✅ 2FA, the security trail, the idle timeout, the working-week editor and geofence enforcement |
 | **Stage 9** | A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3 | ✅ Photos, the document vault, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest |
-| **Stage 10** | A8.4–A8.6, A9.5, A4.11, A3.12 | ⬜ Role-specific dashboards, trends, schedule alerts, weekly rollups, on/offboarding checklists |
-| **Stage 11** | B7 — Manager mode in the app | ⬜ Team roster; approvals and team attendance already ship |
+| **Stage 10** | A3.12, A4.11, A8.4–A8.6, A9.5 | ✅ Dashboards per role and per person, week-on-week trends, weekly rollups, schedule alerts and on/offboarding checklists |
+| **Stage 11** | B7 — Manager mode in the app | ✅ Team roster added; approvals and team attendance already shipped |
 | **Stage 12** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
 
 ### The one thing gating the rest
@@ -339,22 +339,26 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 75 | 9 | 10 | 94 |
-| Mobile App (B) | 19 | 5 | 20 | 44 |
+| Web Dashboard (A) | 82 | 9 | 3 | 94 |
+| Mobile App (B) | 20 | 5 | 19 | 44 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **109** | **16** | **37** | **162** |
+| **Total** | **117** | **16** | **29** | **162** |
 
-The current push is **the web dashboard to completion, AI excluded**. Stages 8 and 9 are
-done. Ten planned rows and nine partial ones remain in Part A, listed under Stage 10 —
-none of them blocks a production deployment. The AI assistant (Part D) is deliberately
+**The web dashboard is complete, AI excluded.** Stages 8, 9, 10 and 11 are all
+delivered. Three planned rows and nine partial ones remain across Part A, and none
+of them blocks a production deployment. The AI assistant (Part D) is deliberately
 out of scope.
 
-**Still open, and worth being explicit about:** on/offboarding checklists (A3.12), weekly
-rollup summaries (A4.11), role-specific dashboards and trend widgets (A8.4–A8.6),
-schedule-change alerts (A9.5), multi-company tenancy (A2.10), a conditional rules engine
-(A2.9, A6.6), a drag-and-drop roster planner (A5.8), and a QR image on the 2FA setup
-screen — the key can be typed in, which every authenticator supports.
+**Still open, and worth being explicit about:** multi-company tenancy (A2.10), a
+conditional rules engine (A2.9, A6.6), a drag-and-drop roster planner (A5.8), a
+per-shift break policy builder (A5.7), a team leave calendar in the app (B4.6),
+biometrics and offline punching (B1.3, B2.4, B6.3), and a QR image on the 2FA
+setup screen — the key can be typed in, which every authenticator supports.
+
+**Two things are code-complete but inert until configured**, and neither is a
+code change: `MAIL_MAILER` is still `log`, so no email leaves the box; and push
+stays silent until a Firebase project exists.
 
 ---
 

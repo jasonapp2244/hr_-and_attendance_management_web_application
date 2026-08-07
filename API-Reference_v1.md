@@ -544,6 +544,58 @@ not an error.
 
 ---
 
+### `GET /team/roster`
+
+Your team's **published** roster over a stretch of days. Same gate and same team
+as `/team/attendance`.
+
+| Query | Default | Notes |
+|---|---|---|
+| `from` | today | `YYYY-MM-DD`, the first day of the window. |
+| `days` | 7 | 1–31. |
+
+```json
+{
+  "ok": true, "from": "2026-08-03", "to": "2026-08-09",
+  "timezone": "America/New_York",
+  "team": [
+    { "employee_id": 2, "name": "Emily Johnson", "employee_code": "EMP-0002",
+      "schedule": [
+        { "date": "2026-08-03", "status": "working", "holiday": null,
+          "shift": { "name": "Morning Shift", "start_time": "09:00:00", "end_time": "17:00:00" },
+          "is_rostered": true },
+        { "date": "2026-08-04", "status": "leave", "holiday": null,
+          "shift": null, "is_rostered": false }
+      ] }
+  ]
+}
+```
+
+Returned **employee-major**: a manager reads down a person to see their week.
+The across-a-day view is what `/team/attendance` already answers.
+
+`status` is one of `working`, `leave`, `holiday`, `day_off`, `weekend`.
+
+**Published only**, exactly like the employee's own `/schedule`. A manager
+seeing draft shifts their team cannot see would tell somebody to come in on a
+day still being planned — which is the whole reason the roster has a draft and
+a published state.
+
+**Leave outranks the roster.** Somebody rostered on a day they later booked off
+comes back as `leave` with no shift, because showing the shift would have a
+manager expecting them.
+
+`is_rostered` distinguishes a day explicitly planned on the roster from one
+falling back to the person's standing shift. Both are `working`; only the first
+was deliberately placed.
+
+A manager with nobody reporting to them gets `team: []`, not an error.
+
+**Failures:** `forbidden` (403, no `approve-leave` permission) ·
+`validation_failed` (422)
+
+---
+
 ## 8. Schedule
 
 ### `GET /schedule`
