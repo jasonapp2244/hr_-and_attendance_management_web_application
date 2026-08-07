@@ -32,6 +32,32 @@ hosting comes first and then the app is built once.
 The Firebase project is **not** needed yet. Push stays off until the app exists;
 `Push-Notifications_Setup.md` covers it when you get there.
 
+### On Hostinger specifically
+
+Hostinger is the chosen host. Everything below works there unchanged — it is an
+ordinary Ubuntu box — but four things are worth knowing before you start.
+
+**Take a VPS, not shared hosting.** The KVM 1 plan (1 vCPU / 4 GB) runs a few
+hundred employees comfortably. Shared and "Business" web hosting cannot run the
+queue worker as a long-lived process and gives you no real per-minute cron, and
+those two between them drive every reminder, the end-of-day close, the nightly
+backup, leave accrual and every scheduled report. The dashboard would look fine
+while none of that ever ran.
+
+**Choose the plain Ubuntu 24.04 template**, not one of the panel images. A VPS
+that arrives with CyberPanel, CloudPanel or Plesk already installed has its own
+nginx and PHP that fight with the setup below; you would spend longer undoing it
+than installing from clean.
+
+**DNS is in hPanel, not on the server.** Point an A record at the VPS IP and let
+it resolve before you get anywhere near certbot in step 5 — a certificate request
+against a name that does not yet resolve fails and rate-limits you for an hour.
+
+**Do not use Hostinger's mail for sending.** Their outbound SMTP is intended for
+low-volume webmail and a new IP has no sending reputation, so password resets and
+scheduled reports land in spam. Use a real sending provider as the table above
+says. This is the single most common way a working deployment looks broken.
+
 ---
 
 ## 1. Server packages
