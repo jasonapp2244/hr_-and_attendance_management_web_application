@@ -71,8 +71,8 @@ The default API base is the emulator's view of a development machine. A release
 build must override it, and will refuse to start if it does not:
 
 ```bash
-flutter build appbundle --dart-define=API_BASE=https://hr.example.com/api/v1
-flutter build ipa       --dart-define=API_BASE=https://hr.example.com/api/v1
+flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build ipa       --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
 ```
 
 Play takes the `.aab`, not an APK.

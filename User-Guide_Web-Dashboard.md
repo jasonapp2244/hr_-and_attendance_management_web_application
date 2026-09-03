@@ -15,7 +15,7 @@ The mobile app needs six further items; they are not repeated here. See
 
 | # | Item | Who | Cost | Lead time |
 |---|---|---|---|---|
-| 1 | **Domain** — e.g. `hr.company.com`. The A record must point at the server **before** the certificate is requested | IT | Free as a subdomain of an existing domain, else $10–20/yr | Minutes to 24 h |
+| 1 | **Domain** — `emp.klutchcleaning.com`, decided. The A record must point at the server **before** the certificate is requested | IT | Free as a subdomain of an existing domain, else $10–20/yr | Minutes to 24 h |
 | 2 | **Server** — 2 vCPU / 4 GB Linux, Ubuntu 22.04 or 24.04, PHP 8.2+, MySQL. Comfortable for a few hundred employees | IT | $10–40/mo | Same day |
 | 3 | **SSL certificate** — Let's Encrypt, free, auto-renewing. Confirm the host includes it before purchasing | Host | Free | Minutes |
 | 4 | **SMTP provider** — Postmark, SES, Mailgun, Brevo, or existing Google Workspace / Microsoft 365 credentials | IT | Free–$25/mo | 1 h with existing credentials; 1–2 days for a new service |

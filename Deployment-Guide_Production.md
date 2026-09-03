@@ -25,7 +25,7 @@ hosting comes first and then the app is built once.
 | | |
 |---|---|
 | A Linux server | 2 vCPU / 4 GB is comfortable for a few hundred employees. Ubuntu 22.04 or 24.04 assumed below. |
-| A domain | e.g. `hr.yourcompany.com`, with an A record already pointing at the server's IP. DNS must resolve **before** you request a certificate. |
+| The domain | `emp.klutchcleaning.com` — this subdomain, not another. Its A record must already point at the server's IP, and DNS must resolve **before** you request a certificate. |
 | An SMTP provider | Postmark, SES, Mailgun or Resend. Not the host's own sendmail — a new server's IP has no sending reputation and its mail lands in spam. |
 | SSH root access | For the one-time setup only. |
 
@@ -282,12 +282,12 @@ spares the employee they belong to.
 
 ```bash
 sudo cp /var/www/emp-repo/deploy/nginx.conf.example /etc/nginx/sites-available/emp
-sudo nano /etc/nginx/sites-available/emp      # replace hr.example.com and the php-fpm socket
+sudo nano /etc/nginx/sites-available/emp      # server_name is already set; check the php-fpm socket
 sudo ln -s /etc/nginx/sites-available/emp /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
-sudo certbot --nginx -d hr.yourcompany.com
+sudo certbot --nginx -d emp.klutchcleaning.com
 ```
 
 The web root is `/var/www/emp/public`, never `/var/www/emp`. Pointing nginx at
@@ -362,13 +362,13 @@ It exits non-zero on a failure, which is why `deploy.sh` runs it last.
 
 Then by hand:
 
-- `https://hr.yourcompany.com` loads over TLS and the padlock is clean
+- `https://emp.klutchcleaning.com` loads over TLS and the padlock is clean
 - Log in as the administrator you created
 - Check in and out once, and confirm the punch shows **your** IP rather than
   `127.0.0.1` — this is the proxy setting working
 - Take a real backup: `sudo -u www-data php artisan db:backup --verify`
 - Send a real email: submit a leave request and confirm it arrives
-- `https://hr.yourcompany.com/privacy` and `/data-deletion` load while logged out
+- `https://emp.klutchcleaning.com/privacy` and `/data-deletion` load while logged out
 
 That last one matters for the next phase — both stores require a publicly
 reachable privacy policy, checked while signed out.
@@ -438,14 +438,17 @@ switch the PHP version in the hosting panel rather than trying to install them.
 Note the host it gives you — on webspace it is usually *not* `127.0.0.1` — and
 put that in `DB_HOST`. Skip the `vrfy\_%` grant; you cannot use it here.
 
-**5. TLS is issued from the panel**, not certbot. Point the domain's document
-root at the `public/` directory of the checkout. This is the one setting that
+**5. TLS is issued from the panel**, not certbot. Point the document root of
+`emp.klutchcleaning.com` at the `public/` directory of the checkout — the
+subdomain is already created and aimed at the webspace, so this is the only
+setting left on it. This is the one setting that
 must be right: a document root at the project directory serves `.env` and
 `storage/` to anyone who guesses the path.
 
 **6 and 7. Cron replaces both the scheduler and the worker.** Add the two
 entries from `deploy/emp-webspace.cron` through the panel's cron manager, and
-set the mode in `.env`:
+confirm the mode in `.env` — `.env.production.example` already ships it set,
+since this is the deployment in use:
 
 ```
 HOSTING_MODE=managed
@@ -551,7 +554,7 @@ whole box is.
 With this done, Part C is complete and Stage 5 can start. The Flutter app has
 what it needs:
 
-- `https://hr.yourcompany.com/api/v1` — 25+ endpoints, documented in
+- `https://emp.klutchcleaning.com/api/v1` — 25+ endpoints, documented in
   `API-Reference_v1.md`
 - Sanctum token auth, per-user rate limits, one JSON error shape
 - Push delivery server-side, waiting only on a Firebase project

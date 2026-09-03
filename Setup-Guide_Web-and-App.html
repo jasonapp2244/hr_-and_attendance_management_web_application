@@ -197,8 +197,8 @@
     <p><b>If the company already has a domain</b> — no purchase needed. Ask IT to create a subdomain:</p>
     <ol>
       <li>Open the company DNS panel</li>
-      <li>Add an <b>A record</b>: name <code>hr</code>, value = the server IP address from step A2</li>
-      <li>Result: <code>hr.company.com</code></li>
+      <li>Add an <b>A record</b>: name <code>emp</code>, value = the server IP address from step A2</li>
+      <li>Result: <code>emp.klutchcleaning.com</code> — this subdomain, not another</li>
     </ol>
     <p><b>If there is no company domain</b> — buy one from any registrar (~$10–20/year), then point its nameservers at
       the host.</p>
@@ -288,7 +288,7 @@ FLUSH PRIVILEGES;</code></pre>
           <td><b>Critical.</b> Left true, any error page displays your database password, mail password and application key to whoever triggered the error. This alone can compromise the whole system.</td>
         </tr>
         <tr>
-          <td><code>APP_URL</code></td><td class="was">http://localhost</td><td class="now">https://hr.company.com</td>
+          <td><code>APP_URL</code></td><td class="was">http://localhost</td><td class="now">https://emp.klutchcleaning.com</td>
           <td>Used to build links in emails and exports. Wrong value = broken password-reset links.</td>
         </tr>
         <tr>
