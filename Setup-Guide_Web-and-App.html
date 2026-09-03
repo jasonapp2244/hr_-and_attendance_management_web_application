@@ -115,7 +115,7 @@
       <span class="meta">Part A · Web — 9 steps</span>
       <span class="meta">Part B · Mobile — 6 steps</span>
       <span class="meta">Laravel 12 · PHP 8.2</span>
-      <span class="meta">29 July 2026</span>
+      <span class="meta">Revised 4 September 2026</span>
     </div>
   </div>
 </header>
@@ -548,14 +548,31 @@ php artisan tinker</code></pre>
 <!-- ============ B ============ -->
 <section id="sB">
   <h2><span class="num">B</span> Mobile setup — 6 steps</h2>
-  <p class="lead">Only needed when the mobile phase is approved. B1 and B3 can be started now at almost no cost, and B3
-    has a two-week external wait.</p>
+  <p class="lead">The app and its API are built. What is left is the paperwork of publishing: the accounts, the
+    signing keys and the store listings. B3 has a two-week external wait and depends on nothing we build, so start it
+    first.</p>
 
-  <div class="note warn">
-    <b>Prerequisite that does not exist yet.</b> The mobile app needs an API for the phone to talk to, and this project
-    has none — there is no <code>routes/api.php</code> and Laravel Sanctum is not installed. That is expected at this
-    stage, but it means B1–B6 prepare the <em>accounts</em>, while the API itself remains development work still to be
-    scheduled.
+  <div class="note ok">
+    <b>The API exists.</b> <code>routes/api.php</code> serves the endpoints under <code>/api/v1</code>, Laravel
+    Sanctum issues the tokens, and every endpoint is written up in <code>API-Reference_v1.md</code>. The Flutter
+    client is in <code>mobile/</code>. Nothing in B is waiting on development work.
+  </div>
+
+  <div class="note crit">
+    <b>The API address is compiled into the app, not configured at runtime.</b> A build made against the wrong
+    address cannot be pointed at the right one afterwards — it has to be rebuilt and resubmitted, which on iOS means
+    another review. Build against the live address:
+    <pre style="margin:8px 0 0"><code>flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build ipa       --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1</code></pre>
+    The default is the Android emulator's address for a laptop, which is why a release build with no
+    <code>--dart-define</code> installs cleanly and then hangs on the login screen with no error.
+  </div>
+
+  <div class="note">
+    <b>Every mobile sign-in needs an employee record.</b> The API resolves the caller to a row in
+    <code>employees</code> and returns 403 <i>"No employee record is linked to this account"</i> when there is none.
+    A hand-created administrator has no employee row, so it signs in and then fails on nearly every screen — link the
+    account from the employee's own page under <b>Sign-in Account</b> before testing.
   </div>
 
   <!-- B1 -->
@@ -619,10 +636,22 @@ php artisan tinker</code></pre>
       <li>Add an <b>Android app</b>; download <code>google-services.json</code></li>
       <li>Add an <b>iOS app</b>; download <code>GoogleService-Info.plist</code></li>
       <li>For iOS, generate an <b>APNs key</b> in the Apple Developer account (B3) and upload it to Firebase</li>
-      <li>Copy the <b>Server Key</b> into the Laravel <code>.env</code> for sending from the backend</li>
+      <li>Under <b>Project settings → Service accounts</b>, generate a private key and save the JSON file to
+        <code>storage/app/firebase/service-account.json</code>, then set <code>FCM_ENABLED=true</code> and
+        <code>FCM_PROJECT_ID</code> in <code>.env</code> and run <code>php artisan config:clear</code></li>
     </ol>
+    <div class="note warn">
+      <b>Not the legacy Server Key.</b> Sending uses FCM's v1 API, which authenticates with that service-account
+      JSON — the old server key does not work and is being retired by Google. The file is a credential: anyone
+      holding it can notify every installation of the app, so it stays out of the web root, out of git, and out of
+      email. <code>Push-Notifications_Setup.md</code> has the full procedure.
+    </div>
     <p>Free at any volume this project will reach. Without it the app only informs staff when they happen to open it,
       which removes most of the advantage of an app over the website.</p>
+    <div class="note">
+      <b>Push is queued, like email.</b> It is delivered by the same scheduled task as everything else, so on this
+      host a notification arrives within about five minutes and nothing arrives at all until A9 is done.
+    </div>
   </div>
 
   <!-- B5 -->
@@ -655,17 +684,22 @@ php artisan tinker</code></pre>
         <tr><td>Feature graphic</td><td>1024 × 500</td><td>—</td></tr>
         <tr><td>Short description</td><td>80 characters</td><td>30-character subtitle</td></tr>
         <tr><td>Full description</td><td>4,000 characters</td><td>4,000 characters</td></tr>
-        <tr><td>Privacy policy URL</td><td><b>Mandatory</b></td><td><b>Mandatory</b></td></tr>
+        <tr><td>Privacy policy URL</td><td><b>Mandatory</b> — <code>/privacy</code></td><td><b>Mandatory</b> — <code>/privacy</code></td></tr>
         <tr><td>Support email</td><td>Required</td><td>Required</td></tr>
         <tr><td>Data safety declaration</td><td>Required</td><td>Privacy nutrition labels</td></tr>
       </tbody>
     </table>
     </div>
+    <div class="note">
+      <b>Both stores require a published privacy policy URL</b>, and this system collects location data. That page is
+      built and served at <code>https://emp.klutchcleaning.com/privacy</code>, alongside
+      <code>/data-deletion</code>; both must load <b>while signed out</b>, which is how the store reviewer will open
+      them. <code>Store-Submission_Checklist.md</code> carries the rest of the submission detail.
+    </div>
     <div class="note warn">
-      <b>Prepare this during development, not after.</b> It routinely delays launches by a week or more because it is
-      treated as an afterthought — the app is finished and then someone has to write descriptions and produce
-      screenshots at exact pixel sizes. Note also that both stores <b>require a published privacy policy URL</b>, and
-      this system collects location data, so that document must exist and be honest about it.
+      <b>This is now the critical path.</b> It routinely delays launches by a week or more because it is
+      treated as an afterthought — the app is finished, as it is here, and then someone has to write descriptions and produce
+      screenshots at exact pixel sizes.
     </div>
   </div>
 </section>
@@ -796,7 +830,7 @@ php artisan view:cache</code></pre>
 <footer>
   <div class="wrap">
     Employment Management Portal — Setup Guide: Web &amp; Mobile<br>
-    Configuration values verified against the live project on 29 July 2026<br>
+    Configuration values verified against the live project on 29 July 2026; parts A and B re-checked against it on 4 September 2026<br>
     Companion documents: Third-Party Dependency Register · Accounts &amp; Services Procurement Guide · Master Feature Catalogue
   </div>
 </footer>

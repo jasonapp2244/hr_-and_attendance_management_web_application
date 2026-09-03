@@ -62,7 +62,7 @@ works without any of this.
 Project settings → **Service accounts** → *Generate new private key*. A JSON
 file downloads.
 
-Put it at `emp/storage/app/firebase/service-account.json`.
+Put it at `hrms/storage/app/firebase/service-account.json`.
 
 **This file is a credential.** Anyone holding it can send a notification to
 every installation of the app. It is gitignored, it lives outside the web root,
@@ -70,7 +70,7 @@ and it should never be emailed or pasted into a chat.
 
 ### 5. Switch it on
 
-In `emp/.env`:
+In `hrms/.env`:
 
 ```env
 FCM_ENABLED=true
