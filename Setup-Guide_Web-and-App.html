@@ -136,7 +136,7 @@
     <li><a class="sub" href="#a6">A6 Install &amp; migrate</a></li>
     <li><a class="sub" href="#a7">A7 SSL</a></li>
     <li><a class="sub" href="#a8">A8 Email</a></li>
-    <li><a class="sub" href="#a9">A9 Backups</a></li>
+    <li><a class="sub" href="#a9">A9 Background jobs &amp; backups</a></li>
     <li><a class="top" href="#sB">B · Mobile setup</a></li>
     <li><a class="sub" href="#b1">B1 Google account</a></li>
     <li><a class="sub" href="#b2">B2 Play Console</a></li>
@@ -163,7 +163,8 @@
     <thead><tr><th>You need</th><th>From</th><th>Used in</th></tr></thead>
     <tbody>
       <tr><td>Domain or subdomain name</td><td>IT</td><td>A1</td></tr>
-      <tr><td>Hosting login (cPanel or SSH)</td><td>Hosting provider</td><td>A2</td></tr>
+      <tr><td>Hosting control panel login</td><td>Hosting provider</td><td>A2, A3, A4, A7, A9</td></tr>
+      <tr><td>SSH or SFTP details for the webspace</td><td>Hosting provider</td><td>A3, A6</td></tr>
       <tr><td>Database name, user and password</td><td>Created in A4</td><td>A5</td></tr>
       <tr><td>SMTP host, username, password</td><td>IT or Brevo</td><td>A8</td></tr>
       <tr><td>Company logo (SVG or PNG)</td><td>Marketing</td><td>A9</td></tr>
@@ -218,29 +219,43 @@
         <tr><td>PHP</td><td>8.2 or newer</td></tr>
         <tr><td>MySQL / MariaDB</td><td>5.7+ / 10.3+</td></tr>
         <tr><td>PHP extensions</td><td><code>pdo_mysql, mbstring, openssl, gd, zip, fileinfo, intl, bcmath, curl, xml, dom, iconv, tokenizer, ctype, json, exif</code></td></tr>
-        <tr><td>Free SSL (Let's Encrypt)</td><td>Included — confirm explicitly</td></tr>
+        <tr><td>Free SSL from the hosting panel</td><td>Included — confirm explicitly</td></tr>
         <tr><td>Ability to set the web root to a subfolder</td><td>Required — see A3</td></tr>
+        <tr><td>Scheduled tasks (cron)</td><td>Required — at least every 5 minutes, see A9</td></tr>
+        <tr><td>SSH or SFTP access</td><td>Required — the setup commands in A6 are run over it</td></tr>
         <tr><td>Automated backups</td><td>Strongly preferred</td></tr>
       </tbody>
     </table>
     </div>
-    <p><b>Recommended: a small VPS ($10–40/month).</b> Shared hosting works today, but it cannot run the background
-      worker and scheduled tasks this system will need as features are added. Choosing a VPS now avoids a migration
-      later.</p>
+    <p><b>Decided: managed webspace.</b> <code>emp.klutchcleaning.com</code> points at the webspace, so that is the
+      host this guide now describes. Every feature works there and nothing is switched off, but two things behave
+      differently from a VPS and both are worth knowing before you start:</p>
+    <ul>
+      <li><b>Nothing runs continuously.</b> The scheduler and the queue are driven by a scheduled task instead of a
+        long-lived process, so a notification goes out within about five minutes rather than within a second. A9
+        sets this up; without it no reminder, no end-of-day close and no email ever fires.</li>
+      <li><b>Backups cannot be automatically test-restored</b>, because that needs a spare database the plan does not
+        provide. Dumps are still taken. Restoring one by hand — see A9 — is the only proof they read back.</li>
+    </ul>
+    <p>A VPS ($10–40/month) reverses both, and moving to one later is a change of host rather than a change of
+      software: the same repository, the same <code>.env</code>, the same commands.</p>
   </div>
 
   <!-- A3 -->
   <div class="step crit" id="a3">
     <h4><span class="n">A3</span> Upload the code and set the web root</h4>
     <p class="who">Owner: Developer · 30 minutes</p>
-    <p>Upload the <code>emp/</code> folder via Git (preferred) or SFTP.</p>
-    <pre><code><span class="c"># On the server</span>
-git clone &lt;repository-url&gt; /var/www/emp
-cd /var/www/emp</code></pre>
+    <p>Upload the application folder via Git (preferred) or SFTP. On managed webspace the checkout goes under the
+      account's home directory, not <code>/var/www</code>, which you have no rights to:</p>
+    <pre><code><span class="c"># Over SSH, from the account's home directory</span>
+git clone &lt;repository-url&gt; ~/emp
+cd ~/emp</code></pre>
+    <p>Then, <b>in the hosting panel</b>, set the document root of <code>emp.klutchcleaning.com</code> to the
+      <code>public</code> folder inside that checkout. On webspace this is a panel setting, not a config file.</p>
 
     <div class="note crit">
-      <b>The single most important setting on this page.</b> The web root must point at
-      <code>/var/www/emp/public</code> — <b>not</b> at <code>/var/www/emp</code>.
+      <b>The single most important setting on this page.</b> The document root must point at the
+      <code>public</code> folder — <b>not</b> at the folder above it.
       <br><br>
       If it points at the application folder, anyone can open <code>yoursite.com/.env</code> in a browser and read your
       database password, application key and mail credentials in plain text. This is the most common and most damaging
@@ -248,15 +263,27 @@ cd /var/www/emp</code></pre>
     </div>
 
     <p>Set folder permissions so the web server can write logs and cache:</p>
-    <pre><code>chmod -R 775 storage bootstrap/cache
-chown -R www-data:www-data storage bootstrap/cache</code></pre>
+    <pre><code>chmod -R 775 storage bootstrap/cache</code></pre>
+    <div class="note">
+      <b>No <code>chown</code> on webspace.</b> There is no <code>www-data</code> user and no root to become; PHP
+      already runs as the hosting account that owns the files. The <code>chown</code> line belongs to a VPS install
+      and will simply fail here — that failure is expected, not a problem to solve.
+    </div>
   </div>
 
   <!-- A4 -->
   <div class="step" id="a4">
     <h4><span class="n">A4</span> Create the database</h4>
     <p class="who">Owner: Developer · 10 minutes</p>
-    <p>In cPanel or MySQL, create a database and a dedicated user:</p>
+    <p><b>On managed webspace the database is created in the hosting panel</b>, not with SQL — the account has no
+      rights to <code>CREATE DATABASE</code> or <code>CREATE USER</code>. Create it there, and write down the three
+      values the panel gives back: the database name, the user, and the <b>host</b>.</p>
+    <div class="note warn">
+      <b>The host is usually not <code>localhost</code>.</b> Managed hosting commonly puts MySQL on a separate
+      machine with a name of its own. Copy whatever the panel shows into <code>DB_HOST</code> in A5; assuming
+      <code>127.0.0.1</code> produces a connection refused that reads like a broken install.
+    </div>
+    <p>For reference, the equivalent SQL on a host where you do have those rights is:</p>
     <pre><code>CREATE DATABASE emp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER 'emp_user'@'localhost' IDENTIFIED BY '&lt;strong-password&gt;';
 GRANT ALL PRIVILEGES ON emp.* TO 'emp_user'@'localhost';
@@ -300,6 +327,10 @@ FLUSH PRIVILEGES;</code></pre>
           <td>Determines what counts as late. Wrong timezone = wrong attendance records for everyone.</td>
         </tr>
         <tr>
+          <td><code>DB_HOST</code></td><td class="was">127.0.0.1</td><td class="now">whatever the panel shows</td>
+          <td><b>On webspace this is rarely <code>127.0.0.1</code>.</b> MySQL usually sits on a separate machine. Copy the host from step A4 exactly.</td>
+        </tr>
+        <tr>
           <td><code>DB_USERNAME</code></td><td class="was">root</td><td class="now">emp_user</td>
           <td>From step A4.</td>
         </tr>
@@ -312,8 +343,8 @@ FLUSH PRIVILEGES;</code></pre>
           <td>Encrypts session data at rest.</td>
         </tr>
         <tr>
-          <td><code>SESSION_DOMAIN</code></td><td class="was">null</td><td class="now">.company.com</td>
-          <td>Scopes the login cookie to your domain.</td>
+          <td><code>SESSION_DOMAIN</code></td><td class="was">null</td><td class="now">emp.klutchcleaning.com</td>
+          <td>Scopes the login cookie to your domain. Must match <code>APP_URL</code>'s host exactly — a mismatch drops the cookie and the login form loops with no error.</td>
         </tr>
         <tr>
           <td><code>LOG_LEVEL</code></td><td class="was">debug</td><td class="now">error</td>
@@ -322,6 +353,10 @@ FLUSH PRIVILEGES;</code></pre>
         <tr>
           <td><code>MAIL_*</code></td><td class="was">log</td><td class="now">see step A8</td>
           <td>No email is delivered until this changes.</td>
+        </tr>
+        <tr>
+          <td><code>HOSTING_MODE</code></td><td class="was">vps</td><td class="now">managed</td>
+          <td>Tells <code>emp:preflight</code> that cron drains the queue rather than a daemon. Left on <code>vps</code> it fails a perfectly healthy install, because a five-minute wait is normal here and alarming on a server.</td>
         </tr>
       </tbody>
     </table>
@@ -338,6 +373,16 @@ FLUSH PRIVILEGES;</code></pre>
   <div class="step crit" id="a6">
     <h4><span class="n">A6</span> Install dependencies and build the database</h4>
     <p class="who">Owner: Developer · 20 minutes</p>
+    <div class="note warn">
+      <b>On webspace, check which PHP you are running first.</b> The command-line PHP is often an older build than
+      the one serving the site, and is usually a versioned binary rather than plain <code>php</code>:
+      <pre style="margin:8px 0 0"><code>which php8.3 || ls /usr/bin/php*
+php8.3 -v &amp;&amp; php8.3 -m | grep -E 'gd|zip|mbstring|intl|bcmath'</code></pre>
+      Substitute that binary for <code>php</code> in every command below, and run Composer through it
+      (<code>php8.3 composer.phar …</code>) if <code>composer</code> is not on the path. <code>gd</code> and
+      <code>zip</code> are what the PDF and Excel exports need; if they are missing, switch the PHP version in the
+      panel rather than trying to install them.
+    </div>
     <pre><code><span class="c"># 1 — install PHP libraries, production mode (excludes dev tools)</span>
 composer install --no-dev --optimize-autoloader
 
@@ -463,17 +508,36 @@ php artisan tinker</code></pre>
 
   <!-- A9 -->
   <div class="step" id="a9">
-    <h4><span class="n">A9</span> Backups and branding</h4>
+    <h4><span class="n">A9</span> Background jobs, backups and branding <span class="badge b-crit">Nothing runs without this</span></h4>
     <p class="who">Owner: IT + Marketing · 1 hour</p>
-    <p><b>Backups.</b> If the host provides automated backups, enable them and confirm the schedule. Otherwise add a
-      nightly database dump:</p>
-    <pre><code><span class="c"># crontab -e — nightly at 02:00, keeps 30 days</span>
-0 2 * * * mysqldump -u emp_user -p'&lt;password&gt;' emp | gzip &gt; /backups/emp-$(date +\%F).sql.gz
-0 3 * * * find /backups -name "emp-*.sql.gz" -mtime +30 -delete</code></pre>
+
+    <p><b>Background jobs.</b> Two scheduled tasks drive everything that is not a click: the check-out reminders, the
+      end-of-day close, leave accrual, document-expiry warnings, the nightly backup, the scheduled reports, and the
+      delivery of every email and push notification. Add both through the panel's cron manager. The exact entries,
+      with the reasoning behind each flag, are in <code>deploy/emp-webspace.cron</code>:</p>
+    <pre><code><span class="c"># APP = the directory containing artisan; PHP = the CLI binary from A6</span>
+*/5 * * * *    cd $APP &amp;&amp; $PHP artisan schedule:run &gt;&gt; storage/logs/scheduler.log 2&gt;&amp;1
+1-56/5 * * * * cd $APP &amp;&amp; $PHP artisan queue:work --stop-when-empty --max-time=50 --tries=3 --backoff=10,60,300 &gt;&gt; storage/logs/queue.log 2&gt;&amp;1</code></pre>
     <div class="note crit">
-      <b>Test a restore before you rely on it.</b> An untested backup is a hope, not a safeguard. Restore one dump into
-      a scratch database and confirm the attendance records are present and readable. Do this once, now — not during an
-      incident.
+      <b>Without these two entries the dashboard looks completely correct and none of it happens.</b> Attendance is
+      never closed, no reminder is sent, no backup is taken, and a leave decision never reaches the employee. There is
+      no error anywhere — the work simply queues up and waits. This is the single easiest thing to skip on this page.
+    </div>
+    <p>Two details are not arbitrary. The scheduler runs every <b>five</b> minutes because the platform will not repeat
+      a job more often, and every scheduled task in this project already falls on a five-minute boundary, so nothing is
+      missed. The queue entry carries <code>--max-time=50</code> because the platform kills any run still going at 60
+      seconds; the worker retires at 50 and the next run continues, whereas being killed mid-job leaves that job
+      reserved until it times out. The queue is offset by a minute so the two never start in the same second.</p>
+
+    <p><b>Backups.</b> Once the scheduler above is running, the nightly database backup is already part of it — it
+      fires at 02:10 with no separate crontab entry. If the host also provides its own automated backups, enable those
+      too and confirm the schedule.</p>
+    <div class="note crit">
+      <b>On webspace the backup is taken but not proved.</b> On a server, <code>db:backup --verify</code> restores each
+      dump into a scratch database to confirm it reads back. This account cannot create one, so the command degrades to
+      a warning and you get dumps without the proof. <b>Restore one by hand into any database you can create, before
+      go-live</b>, and confirm the attendance records are present and readable. An untested backup is a hope, not a
+      safeguard, and this is a system payroll is calculated from.
     </div>
     <p><b>Branding.</b> Replace the placeholder logo with the company's own so exported PDF reports look official.
       Supply an SVG or transparent PNG, plus a square version for small spaces.</p>
@@ -674,7 +738,10 @@ php artisan tinker</code></pre>
       <tr><td><span class="box"></span></td><td>Real admin account works</td><td>Log in with the account created in A6</td></tr>
       <tr><td><span class="box"></span></td><td>Database user is not <code>root</code></td><td>Inspect <code>.env</code></td></tr>
       <tr><td><span class="box"></span></td><td>Timezone correct</td><td>Check in and confirm the recorded time matches the wall clock</td></tr>
-      <tr><td><span class="box"></span></td><td>Backup runs and restores</td><td>Restore one dump into a scratch database</td></tr>
+      <tr><td><span class="box"></span></td><td><b>Scheduled tasks are running</b></td><td>Check <code>storage/logs/scheduler.log</code> has entries from the last five minutes. If it is empty, nothing in A9 is happening</td></tr>
+      <tr><td><span class="box"></span></td><td><b>The queue drains</b></td><td>Trigger a password reset and confirm the mail arrives within about five minutes — not instantly, which is normal here</td></tr>
+      <tr><td><span class="box"></span></td><td><code>HOSTING_MODE=managed</code></td><td>Run <code>php artisan emp:preflight</code> — on <code>vps</code> it fails the queue check on a healthy install</td></tr>
+      <tr><td><span class="box"></span></td><td>Backup runs and restores</td><td>Restore one dump into a scratch database <b>by hand</b> — automatic verification is unavailable on this host</td></tr>
       <tr><td><span class="box"></span></td><td>PDF and Excel export</td><td>Download one of each and open it</td></tr>
       <tr><td><span class="box"></span></td><td>Company logo appears</td><td>Check the sidebar and an exported PDF</td></tr>
       <tr><td><span class="box"></span></td><td>Privacy notice issued to staff</td><td>HR confirms distribution before location collection begins</td></tr>
@@ -705,6 +772,10 @@ php artisan tinker</code></pre>
       <tr><td>Uploaded images do not display</td><td>Storage link missing</td><td><code>php artisan storage:link</code>. <code>deploy.sh</code> runs it and <code>emp:preflight</code> checks for it</td></tr>
       <tr><td>Wrong times on attendance</td><td><code>APP_TIMEZONE</code> incorrect</td><td>Set it, then <code>php artisan config:cache</code></td></tr>
       <tr><td>Routes 404 after an update</td><td>Stale route cache</td><td><code>php artisan route:clear &amp;&amp; php artisan route:cache</code></td></tr>
+      <tr><td><b>Nothing is sent, and nothing is logged</b></td><td>The A9 scheduled tasks were never added</td><td>Add both cron entries. Every reminder, close, backup and email depends on them; there is no error when they are absent</td></tr>
+      <tr><td>Email and notifications take minutes</td><td>Normal on this host</td><td>Not a fault. The queue is drained by cron every five minutes rather than by a process that runs continuously. Only a move to a VPS changes it</td></tr>
+      <tr><td>Preflight fails the queue check on a healthy install</td><td><code>HOSTING_MODE</code> still <code>vps</code></td><td>Set <code>HOSTING_MODE=managed</code>, then <code>php artisan config:cache</code></td></tr>
+      <tr><td><code>chown: invalid user 'www-data'</code></td><td>A VPS command on webspace</td><td>Expected — skip it. PHP already runs as the account that owns the files</td></tr>
     </tbody>
   </table>
   </div>
