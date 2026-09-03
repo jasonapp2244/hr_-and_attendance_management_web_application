@@ -52,3 +52,8 @@ Thumbs.db
 # Firebase service-account key — can push to every installation of the app.
 **/storage/app/firebase/
 *service-account*.json
+
+# Application bundles. hrms/.zip carried a .env and the whole vendor tree into
+# a public repository once; it must never be committed again. Keep the file
+# locally if it is useful for uploading vendor/ to a host without composer.
+*.zip
