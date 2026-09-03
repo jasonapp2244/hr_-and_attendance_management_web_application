@@ -156,8 +156,9 @@ sudo mkdir -p /var/www
 sudo chown -R www-data:www-data /var/www
 sudo -u www-data git clone https://github.com/jasonapp2244/hr_-and_attendance_management_web_application.git /var/www/emp-repo
 
-# The Laravel app is the emp/ subfolder of the repository.
-sudo ln -s /var/www/emp-repo/emp /var/www/emp
+# The Laravel app is the hrms/ subfolder of the repository. The symlink name
+# is what nginx and the systemd unit refer to, and stays 'emp' either way.
+sudo ln -s /var/www/emp-repo/hrms /var/www/emp
 
 cd /var/www/emp
 sudo -u www-data composer install --no-dev --optimize-autoloader
@@ -492,8 +493,10 @@ trusted.
 
 **It works out where it is.** The repository root and the application are the same
 directory on the layout above, but on a panel host the site sits at `<domain>/` and
-the application at `<domain>/emp`, because the web root has to point at
-`emp/public`. Both are detected, so the command is the same either way. The file
+the application in a subdirectory, because the web root has to point at that
+subdirectory's `public/`. The repository root, `hrms/` and `emp/` are all tried in
+order — the subdirectory has carried both names — so the command is the same either
+way and a rename does not break the deploy. The file
 owner is read off the checkout rather than assumed to be `www-data` — deploying as
 root otherwise leaves root-owned caches that PHP-FPM cannot write, which shows up
 as a 500 with nothing in the log.
