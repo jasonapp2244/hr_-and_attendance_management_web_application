@@ -1,6 +1,6 @@
-# Full Professional HRMS — Additional Modules
+# Full Professional Employment Management Portal — Additional Modules
 
-**Project:** HR & Attendance Management Application
+**Project:** Employment Management Portal
 **Date:** 2026-07-29
 **Scope:** Modules required for a **complete HRMS** that are **not** covered in `Feature-List_Web-and-App.md` or `Professional-HRMS_Recommended-Features.html`.
 

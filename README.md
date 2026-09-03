@@ -1,6 +1,6 @@
-# HR & Attendance Management Web Application
+# Employment Management Portal Web Application
 
-A web-based HR & Attendance management system built with **Laravel 12** and **PHP 8.2**,
+A web-based Employment Management Portal management system built with **Laravel 12** and **PHP 8.2**,
 with a Flutter app on the same API.
 
 ## Features
@@ -36,27 +36,27 @@ with a Flutter app on the same API.
 ## Getting started
 
 ```bash
-cd hrms
+cd emp
 composer install
 cp .env.example .env
 php artisan key:generate
 # configure DB credentials in .env
 php artisan migrate
-php artisan hrms:install      # asks for the company and the first administrator
+php artisan emp:install      # asks for the company and the first administrator
 php artisan serve
 ```
 
 Then open http://127.0.0.1:8000 and sign in with the account you just made.
 
-`hrms:install` seeds the roles and permissions, creates the company, and makes
+`emp:install` seeds the roles and permissions, creates the company, and makes
 the administrator. Run on a database that already has a company, it lists them
 and asks which one the administrator is for rather than quietly adding another —
 staff on different companies cannot see each other, so an admin attached to the
 wrong one gets a dashboard that loads and is empty. To skip the question:
 
 ```bash
-php artisan hrms:install --company-id=1   # join an existing company
-php artisan hrms:install --force          # genuinely create a second company
+php artisan emp:install --company-id=1   # join an existing company
+php artisan emp:install --force          # genuinely create a second company
 ```
 
 ### Demo data (local only)
@@ -70,14 +70,14 @@ php artisan db:seed --class=Database\\Seeders\\DemoDataSeeder
 php artisan db:seed --class=Database\\Seeders\\AttendanceSeeder
 ```
 
-That gives you `admin@hrms.test` / `password`. Never run either on a real
+That gives you `admin@emp.test` / `password`. Never run either on a real
 install — fake staff and fake punches are indistinguishable from real ones a
-week later, and `hrms:preflight` fails a deploy that still has them. To clear
+week later, and `emp:preflight` fails a deploy that still has them. To clear
 them out again:
 
 ```bash
-php artisan hrms:purge-demo --dry-run   # read this before running it for real
-php artisan hrms:purge-demo
+php artisan emp:purge-demo --dry-run   # read this before running it for real
+php artisan emp:purge-demo
 ```
 
 ## Documentation
@@ -85,7 +85,7 @@ php artisan hrms:purge-demo
 | Document | What it covers |
 |---|---|
 | `User-Guide_Web-Dashboard.md` | What the client supplies, and how to use every screen |
-| `Deployment-Guide_Production.md` | Server setup, TLS, scheduler, queue worker, `hrms:preflight` |
+| `Deployment-Guide_Production.md` | Server setup, TLS, scheduler, queue worker, `emp:preflight` |
 | `Push-Notifications_Setup.md` | The Firebase work needed to switch push on |
 | `API-Reference_v1.md` | The v1 API the mobile app consumes |
 | `Feature-List_Web-and-App.md` | Every feature, built and planned, with status |

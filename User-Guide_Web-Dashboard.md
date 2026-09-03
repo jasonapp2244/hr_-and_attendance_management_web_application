@@ -55,7 +55,7 @@ personally loses control of them the day that person leaves.
 | Shifts | Start, end, grace period, break | Defines late, early-leave, and paid hours. |
 | Working week and holidays | Weekend days, public-holiday calendar | Weekends and holidays count as neither present nor absent, and are excluded from leave day counts. |
 | Employee data | The 11-column import file | See §2.3. Template: `employee-import-template.csv`. |
-| First administrator | Name, email, password | Created by `hrms:install`. |
+| First administrator | Name, email, password | Created by `emp:install`. |
 | Data retention period | How long records are kept | Goes into the privacy notice. |
 | Support contact | An address staff can write to | Appears on the public pages. |
 
@@ -72,7 +72,7 @@ personally loses control of them the day that person leaves.
 
 All 130 software libraries are free and open-source and require no account. The
 deploy scripts, nginx configuration, systemd worker, cron schedule and the
-`hrms:preflight` gate are written and live in `deploy/`. See
+`emp:preflight` gate are written and live in `deploy/`. See
 `Deployment-Guide_Production.md` for the server-side procedure.
 
 ---
@@ -278,7 +278,7 @@ read as the employer's pages rather than the software's.
 7. **Roster left unpublished.** Staff see nothing and assume the feature is
    broken.
 
-`php artisan hrms:preflight` catches 1 through 4, and is the gate `deploy.sh`
+`php artisan emp:preflight` catches 1 through 4, and is the gate `deploy.sh`
 runs last.
 
 ---

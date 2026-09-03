@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>HR &amp; Attendance Management — Setup Guide: Web &amp; Mobile</title>
+<title>Employment Management Portal — Setup Guide: Web &amp; Mobile</title>
 <style>
   :root{
     --bg:#f7f8fa; --panel:#ffffff; --ink:#1a2233; --muted:#5b6b85;
@@ -174,14 +174,14 @@
 
   <div class="note crit">
     <b>Read this before running any seeder.</b> This project contains a demo seeder that creates a working administrator
-    account with the email <code>admin@hrms.test</code> and the password <code>password</code>. On a development machine
+    account with the email <code>admin@emp.test</code> and the password <code>password</code>. On a development machine
     that is convenient. <b>On a public server it is an open door.</b> Step A6 gives the exact command that loads roles
     and permissions <em>without</em> the demo data. Do not run the plain <code>db:seed</code> command on production.
   </div>
 
   <div class="note">
-    <b>Where the application lives.</b> The Laravel application is the <code>hrms/</code> folder, not the repository
-    root. Every command below is run from inside <code>hrms/</code>.
+    <b>Where the application lives.</b> The Laravel application is the <code>emp/</code> folder, not the repository
+    root. Every command below is run from inside <code>emp/</code>.
   </div>
 </section>
 
@@ -233,14 +233,14 @@
   <div class="step crit" id="a3">
     <h4><span class="n">A3</span> Upload the code and set the web root</h4>
     <p class="who">Owner: Developer · 30 minutes</p>
-    <p>Upload the <code>hrms/</code> folder via Git (preferred) or SFTP.</p>
+    <p>Upload the <code>emp/</code> folder via Git (preferred) or SFTP.</p>
     <pre><code><span class="c"># On the server</span>
-git clone &lt;repository-url&gt; /var/www/hrms
-cd /var/www/hrms</code></pre>
+git clone &lt;repository-url&gt; /var/www/emp
+cd /var/www/emp</code></pre>
 
     <div class="note crit">
       <b>The single most important setting on this page.</b> The web root must point at
-      <code>/var/www/hrms/public</code> — <b>not</b> at <code>/var/www/hrms</code>.
+      <code>/var/www/emp/public</code> — <b>not</b> at <code>/var/www/emp</code>.
       <br><br>
       If it points at the application folder, anyone can open <code>yoursite.com/.env</code> in a browser and read your
       database password, application key and mail credentials in plain text. This is the most common and most damaging
@@ -257,9 +257,9 @@ chown -R www-data:www-data storage bootstrap/cache</code></pre>
     <h4><span class="n">A4</span> Create the database</h4>
     <p class="who">Owner: Developer · 10 minutes</p>
     <p>In cPanel or MySQL, create a database and a dedicated user:</p>
-    <pre><code>CREATE DATABASE hrms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'hrms_user'@'localhost' IDENTIFIED BY '&lt;strong-password&gt;';
-GRANT ALL PRIVILEGES ON hrms.* TO 'hrms_user'@'localhost';
+    <pre><code>CREATE DATABASE emp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'emp_user'@'localhost' IDENTIFIED BY '&lt;strong-password&gt;';
+GRANT ALL PRIVILEGES ON emp.* TO 'emp_user'@'localhost';
 FLUSH PRIVILEGES;</code></pre>
     <div class="note warn">
       <b>Do not reuse the development settings.</b> Locally this project connects as <code>root</code> with
@@ -300,7 +300,7 @@ FLUSH PRIVILEGES;</code></pre>
           <td>Determines what counts as late. Wrong timezone = wrong attendance records for everyone.</td>
         </tr>
         <tr>
-          <td><code>DB_USERNAME</code></td><td class="was">root</td><td class="now">hrms_user</td>
+          <td><code>DB_USERNAME</code></td><td class="was">root</td><td class="now">emp_user</td>
           <td>From step A4.</td>
         </tr>
         <tr>
@@ -361,7 +361,7 @@ php artisan view:cache</code></pre>
     <div class="note crit">
       <b>Step 4 must name the seeder class explicitly.</b> Running the bare <code>php artisan db:seed</code> also runs
       <code>DemoDataSeeder</code>, which creates a live administrator account —
-      <code>admin@hrms.test</code> with the password <code>password</code> — plus fictional employees and fake
+      <code>admin@emp.test</code> with the password <code>password</code> — plus fictional employees and fake
       attendance records. On a public server that is both a security hole and corrupted data. Use
       <code>--class=RolePermissionSeeder</code> exactly as written.
     </div>
@@ -430,7 +430,7 @@ $u-&gt;assignRole('admin');</code></pre>
 <span class="k">MAIL_USERNAME</span>=&lt;your-login&gt;
 <span class="k">MAIL_PASSWORD</span>=&lt;your-smtp-key&gt;
 <span class="k">MAIL_FROM_ADDRESS</span>="hr@company.com"
-<span class="k">MAIL_FROM_NAME</span>="HR &amp; Attendance"</code></pre>
+<span class="k">MAIL_FROM_NAME</span>="Employment Management Portal"</code></pre>
 
     <div class="note warn">
       <b>This project runs Laravel 12, which uses <code>MAIL_SCHEME</code>, not <code>MAIL_ENCRYPTION</code>.</b>
@@ -441,7 +441,7 @@ $u-&gt;assignRole('admin');</code></pre>
     <p>Clear the cache and send a test:</p>
     <pre><code>php artisan config:clear
 php artisan tinker</code></pre>
-    <pre><code>Mail::raw('Test from HRMS', fn($m) =&gt; $m-&gt;to('you@company.com')-&gt;subject('Test'));</code></pre>
+    <pre><code>Mail::raw('Test from Employment Management Portal', fn($m) =&gt; $m-&gt;to('you@company.com')-&gt;subject('Test'));</code></pre>
 
     <p><b>Then add DNS records</b>, or your mail will be filed as spam regardless of correct settings. The provider
       supplies the exact values; IT adds them to the domain:</p>
@@ -468,8 +468,8 @@ php artisan tinker</code></pre>
     <p><b>Backups.</b> If the host provides automated backups, enable them and confirm the schedule. Otherwise add a
       nightly database dump:</p>
     <pre><code><span class="c"># crontab -e — nightly at 02:00, keeps 30 days</span>
-0 2 * * * mysqldump -u hrms_user -p'&lt;password&gt;' hrms | gzip &gt; /backups/hrms-$(date +\%F).sql.gz
-0 3 * * * find /backups -name "hrms-*.sql.gz" -mtime +30 -delete</code></pre>
+0 2 * * * mysqldump -u emp_user -p'&lt;password&gt;' emp | gzip &gt; /backups/emp-$(date +\%F).sql.gz
+0 3 * * * find /backups -name "emp-*.sql.gz" -mtime +30 -delete</code></pre>
     <div class="note crit">
       <b>Test a restore before you rely on it.</b> An untested backup is a hope, not a safeguard. Restore one dump into
       a scratch database and confirm the attendance records are present and readable. Do this once, now — not during an
@@ -670,7 +670,7 @@ php artisan tinker</code></pre>
       <tr><td><span class="box"></span></td><td><b>GPS capture works</b></td><td>Check in from a real phone; confirm coordinates land on the record</td></tr>
       <tr><td><span class="box"></span></td><td>Email delivers</td><td>Send the test message from A8 and confirm it arrives in an inbox, not spam</td></tr>
       <tr><td><span class="box"></span></td><td>SPF and DKIM present</td><td>Check the received message headers show a pass</td></tr>
-      <tr><td><span class="box"></span></td><td><b>Demo data absent</b></td><td>Confirm <code>admin@hrms.test</code> does <b>not</b> exist in the users table</td></tr>
+      <tr><td><span class="box"></span></td><td><b>Demo data absent</b></td><td>Confirm <code>admin@emp.test</code> does <b>not</b> exist in the users table</td></tr>
       <tr><td><span class="box"></span></td><td>Real admin account works</td><td>Log in with the account created in A6</td></tr>
       <tr><td><span class="box"></span></td><td>Database user is not <code>root</code></td><td>Inspect <code>.env</code></td></tr>
       <tr><td><span class="box"></span></td><td>Timezone correct</td><td>Check in and confirm the recorded time matches the wall clock</td></tr>
@@ -702,7 +702,7 @@ php artisan tinker</code></pre>
       <tr><td>Email silently does nothing</td><td><code>MAIL_MAILER</code> still <code>log</code></td><td>Complete A8, then <code>php artisan config:clear</code></td></tr>
       <tr><td>Email sends but lands in spam</td><td>Missing SPF/DKIM</td><td>Add the DNS records in A8</td></tr>
       <tr><td>Styles missing, page unformatted</td><td><code>public/assets</code> missing or not readable</td><td>Re-upload <code>public/assets</code> and check the web user can read it &mdash; there is no build step to re-run</td></tr>
-      <tr><td>Uploaded images do not display</td><td>Storage link missing</td><td><code>php artisan storage:link</code>. <code>deploy.sh</code> runs it and <code>hrms:preflight</code> checks for it</td></tr>
+      <tr><td>Uploaded images do not display</td><td>Storage link missing</td><td><code>php artisan storage:link</code>. <code>deploy.sh</code> runs it and <code>emp:preflight</code> checks for it</td></tr>
       <tr><td>Wrong times on attendance</td><td><code>APP_TIMEZONE</code> incorrect</td><td>Set it, then <code>php artisan config:cache</code></td></tr>
       <tr><td>Routes 404 after an update</td><td>Stale route cache</td><td><code>php artisan route:clear &amp;&amp; php artisan route:cache</code></td></tr>
     </tbody>
@@ -723,7 +723,7 @@ php artisan view:cache</code></pre>
 
 <footer>
   <div class="wrap">
-    HR &amp; Attendance Management Application — Setup Guide: Web &amp; Mobile<br>
+    Employment Management Portal — Setup Guide: Web &amp; Mobile<br>
     Configuration values verified against the live project on 29 July 2026<br>
     Companion documents: Third-Party Dependency Register · Accounts &amp; Services Procurement Guide · Master Feature Catalogue
   </div>

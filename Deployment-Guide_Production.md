@@ -32,9 +32,50 @@ hosting comes first and then the app is built once.
 The Firebase project is **not** needed yet. Push stays off until the app exists;
 `Push-Notifications_Setup.md` covers it when you get there.
 
+### On IONOS specifically
+
+IONOS is the chosen host. Everything below works there unchanged — a Cloud VPS is
+an ordinary Ubuntu box — but four things are worth knowing before you start.
+
+**Take a Cloud VPS, not "Hosting".** The product picker offers *"Hosting — using
+webspace and databases"*, and it cannot run this application. IONOS webspace caps
+every cron job at **60 seconds** and will not repeat one more often than every
+**5 minutes**. Step 6 needs the scheduler every minute, step 7 needs a queue
+worker that stays alive indefinitely, and `db:backup --verify` restores each dump
+into a scratch database, which on its own outlives a 60-second budget. None of
+that announces itself: on webspace the dashboard looks correct while attendance
+is never closed, no reminder is sent, no backup is taken, and no leave decision
+ever reaches an employee. 2 vCPU / 4 GB is the size to take.
+
+**Cloud Cubes also works, and is the harder road.** The panel promotes it with a
+free trial. Cubes S is 2 vCPU / 4 GB / 120 GB NVMe and Ubuntu 24.04 is available
+as `ubuntu-24.04-server-cloudimg-amd64`, so it is a genuine option — but it lives
+in the Data Center Designer under a separate IONOS Cloud contract, and you
+assemble the NIC, the public IP and the firewall yourself. A Cube created without
+a root password or an injected SSH key cannot be reached afterwards. Per-minute
+billing earns nothing here either, because the worker and the scheduler run
+continuously and so this never scales to zero. Reasonable for rehearsing the
+build; put the real install on the VPS. Everything from step 1 onward is
+identical either way.
+
+**DNS is in the IONOS panel, not on the server.** Point an A record at the VPS IP
+under Domains & SSL and let it resolve before you get anywhere near certbot in
+step 5 — a certificate request against a name that does not yet resolve fails and
+rate-limits you for an hour. There is no need to buy an SSL product; certbot
+issues the certificate in step 5.
+
+**Outbound port 25 is blocked; 587 is not.** Every new IONOS VPS has TCP/25
+blocked at the network level, above the server firewall — no toggle exists in the
+panel, only a phone call to support. This costs nothing provided the sending
+provider from the table above is configured on **587** or **465**, which all of
+them support; it only bites if you assume 25 works. The default inbound firewall
+already allows 22, 80 and 443, so no firewall change is needed for this
+deployment.
+
 ### On Hostinger specifically
 
-Hostinger is the chosen host. Everything below works there unchanged — it is an
+Hostinger is the alternative these notes were first written for, kept in case
+it is used instead. Everything below works there unchanged — it is an
 ordinary Ubuntu box — but four things are worth knowing before you start.
 
 **Take a VPS, not shared hosting.** The KVM 1 plan (1 vCPU / 4 GB) runs a few
@@ -90,15 +131,15 @@ sudo mysql
 ```
 
 ```sql
-CREATE DATABASE hrms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'hrms'@'localhost' IDENTIFIED BY 'a-long-random-password';
-GRANT ALL PRIVILEGES ON hrms.* TO 'hrms'@'localhost';
+CREATE DATABASE emp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'emp'@'localhost' IDENTIFIED BY 'a-long-random-password';
+GRANT ALL PRIVILEGES ON emp.* TO 'emp'@'localhost';
 
 -- db:backup --verify restores each dump into a scratch database named
--- vrfy_hrms_<time> to prove it reads back, then drops it. The same user needs
+-- vrfy_emp_<time> to prove it reads back, then drops it. The same user needs
 -- to be able to create and drop those. The backslash escapes the underscore,
 -- which is a single-character wildcard in a GRANT pattern.
-GRANT ALL PRIVILEGES ON `vrfy\_%`.* TO 'hrms'@'localhost';
+GRANT ALL PRIVILEGES ON `vrfy\_%`.* TO 'emp'@'localhost';
 
 FLUSH PRIVILEGES;
 ```
@@ -113,12 +154,12 @@ nothing else on the server.
 ```bash
 sudo mkdir -p /var/www
 sudo chown -R www-data:www-data /var/www
-sudo -u www-data git clone https://github.com/jasonapp2244/hr_-and_attendance_management_web_application.git /var/www/hrms-repo
+sudo -u www-data git clone https://github.com/jasonapp2244/hr_-and_attendance_management_web_application.git /var/www/emp-repo
 
-# The Laravel app is the hrms/ subfolder of the repository.
-sudo ln -s /var/www/hrms-repo/hrms /var/www/hrms
+# The Laravel app is the emp/ subfolder of the repository.
+sudo ln -s /var/www/emp-repo/emp /var/www/emp
 
-cd /var/www/hrms
+cd /var/www/emp
 sudo -u www-data composer install --no-dev --optimize-autoloader
 ```
 
@@ -126,17 +167,17 @@ Permissions — only these two trees need to be writable, and nothing else shoul
 be:
 
 ```bash
-sudo chown -R www-data:www-data /var/www/hrms/storage /var/www/hrms/bootstrap/cache
-sudo chmod -R 775 /var/www/hrms/storage /var/www/hrms/bootstrap/cache
+sudo chown -R www-data:www-data /var/www/emp/storage /var/www/emp/bootstrap/cache
+sudo chmod -R 775 /var/www/emp/storage /var/www/emp/bootstrap/cache
 ```
 
 Backups live outside the application directory, so that losing the deploy does
 not take the backups with it:
 
 ```bash
-sudo mkdir -p /var/backups/hrms
-sudo chown www-data:www-data /var/backups/hrms
-sudo chmod 750 /var/backups/hrms
+sudo mkdir -p /var/backups/emp
+sudo chown www-data:www-data /var/backups/emp
+sudo chmod 750 /var/backups/emp
 ```
 
 ---
@@ -144,9 +185,9 @@ sudo chmod 750 /var/backups/hrms
 ## 4. Environment
 
 ```bash
-sudo -u www-data cp /var/www/hrms/.env.production.example /var/www/hrms/.env
+sudo -u www-data cp /var/www/emp/.env.production.example /var/www/emp/.env
 sudo -u www-data php artisan key:generate
-sudo -u www-data nano /var/www/hrms/.env
+sudo -u www-data nano /var/www/emp/.env
 ```
 
 Every line marked `CHANGE ME` in that file has to be filled in. The four that
@@ -175,7 +216,7 @@ sudo -u www-data php artisan migrate --force
 Then create the company and the first administrator:
 
 ```bash
-sudo -u www-data php artisan hrms:install
+sudo -u www-data php artisan emp:install
 ```
 
 It asks for the company name, timezone and currency, then the administrator's
@@ -188,7 +229,7 @@ refuses them, and nothing says why.
 For an unattended deploy, pass everything instead:
 
 ```bash
-sudo -u www-data php artisan hrms:install --no-interaction \
+sudo -u www-data php artisan emp:install --no-interaction \
     --company="Your Company" \
     --timezone=America/New_York \
     --currency=USD \
@@ -200,7 +241,7 @@ sudo -u www-data php artisan hrms:install --no-interaction \
 The company timezone is the one to get right. Attendance is judged against shift
 times in it, so a wrong value marks the entire workforce late every morning —
 and produces plausible data rather than an error. The command validates it
-against the real IANA list, and `hrms:preflight` checks it again later.
+against the real IANA list, and `emp:preflight` checks it again later.
 
 ### Adding an administrator to a company that already exists
 
@@ -209,7 +250,7 @@ a purge removed the seeded one — attach the new administrator to the existing
 company rather than making another:
 
 ```bash
-sudo -u www-data php artisan hrms:install --company-id=1
+sudo -u www-data php artisan emp:install --company-id=1
 ```
 
 Run it without arguments and it lists the companies with their employee counts
@@ -219,14 +260,14 @@ company and companies cannot see each other. `--force` is what creates a second
 company, and it exists only for installs that genuinely run two.
 
 **Do not run `db:seed --class=DemoDataSeeder` on production.** It creates
-`admin@hrms.test` and `hr@hrms.test`, both with the password `password`, plus a
+`admin@emp.test` and `hr@emp.test`, both with the password `password`, plus a
 set of fictional employees and a fortnight of attendance they never worked. A
 plain `php artisan db:seed` is safe — it now creates roles and permissions only
 — but if a demo seeder was ever run here by mistake, clear it out:
 
 ```bash
-sudo -u www-data php artisan hrms:purge-demo --dry-run   # read this first
-sudo -u www-data php artisan hrms:purge-demo --force
+sudo -u www-data php artisan emp:purge-demo --dry-run   # read this first
+sudo -u www-data php artisan emp:purge-demo --force
 ```
 
 Read the dry run properly. Attendance and leave cascade from `employees`, so
@@ -240,16 +281,16 @@ spares the employee they belong to.
 ## 5. nginx and TLS
 
 ```bash
-sudo cp /var/www/hrms-repo/deploy/nginx.conf.example /etc/nginx/sites-available/hrms
-sudo nano /etc/nginx/sites-available/hrms      # replace hr.example.com and the php-fpm socket
-sudo ln -s /etc/nginx/sites-available/hrms /etc/nginx/sites-enabled/
+sudo cp /var/www/emp-repo/deploy/nginx.conf.example /etc/nginx/sites-available/emp
+sudo nano /etc/nginx/sites-available/emp      # replace hr.example.com and the php-fpm socket
+sudo ln -s /etc/nginx/sites-available/emp /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
 sudo certbot --nginx -d hr.yourcompany.com
 ```
 
-The web root is `/var/www/hrms/public`, never `/var/www/hrms`. Pointing nginx at
+The web root is `/var/www/emp/public`, never `/var/www/emp`. Pointing nginx at
 the project directory serves `.env`, `storage/` and `vendor/` to anyone who
 guesses a path — which is the database password and every backup.
 
@@ -266,9 +307,9 @@ misconfiguration into a year-long one.
 ## 6. The scheduler
 
 ```bash
-sudo cp /var/www/hrms-repo/deploy/hrms-scheduler.cron /etc/cron.d/hrms
-sudo nano /etc/cron.d/hrms        # set MAILTO to a real inbox
-sudo chmod 644 /etc/cron.d/hrms
+sudo cp /var/www/emp-repo/deploy/emp-scheduler.cron /etc/cron.d/emp
+sudo nano /etc/cron.d/emp        # set MAILTO to a real inbox
+sudo chmod 644 /etc/cron.d/emp
 ```
 
 One line, every minute; Laravel decides internally what is due. Without it:
@@ -279,7 +320,7 @@ One line, every minute; Laravel decides internally what is due. Without it:
 | `attendance:close-day` | hourly | Open punches are never closed; recorded hours stay wrong |
 | `db:backup --verify` | 02:10 daily | There are no backups at all |
 
-None of the three announces its absence. `hrms:preflight` infers the scheduler's
+None of the three announces its absence. `emp:preflight` infers the scheduler's
 health from whether a backup actually appeared, which is the only end-to-end
 evidence available.
 
@@ -288,10 +329,10 @@ evidence available.
 ## 7. The queue worker
 
 ```bash
-sudo cp /var/www/hrms-repo/deploy/hrms-worker.service /etc/systemd/system/
+sudo cp /var/www/emp-repo/deploy/emp-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now hrms-worker
-sudo systemctl status hrms-worker
+sudo systemctl enable --now emp-worker
+sudo systemctl status emp-worker
 ```
 
 Email and push are queued, so nothing is delivered without this. What makes it
@@ -304,14 +345,14 @@ anything.
 ## 8. Verify
 
 ```bash
-cd /var/www/hrms
+cd /var/www/emp
 sudo -u www-data php artisan config:cache
 sudo -u www-data php artisan route:cache
 sudo -u www-data php artisan view:cache
-sudo -u www-data php artisan hrms:preflight
+sudo -u www-data php artisan emp:preflight
 ```
 
-`hrms:preflight` is the actual gate. It checks debug mode, the URL and TLS
+`emp:preflight` is the actual gate. It checks debug mode, the URL and TLS
 settings, proxy trust, database and pending migrations, writable paths, mail,
 whether anything is draining the queue, whether the scheduler has produced a
 recent backup, the backup path and binaries, push coherence, company timezones,
@@ -334,10 +375,106 @@ reachable privacy policy, checked while signed out.
 
 ---
 
+## Deploying to managed webspace instead
+
+Everything above assumes a server you have root on. This section is the
+alternative for shared webspace — IONOS webspace, cPanel and the like — where
+there is no root, no `apt`, no nginx of your own, no certbot and no systemd.
+
+It works, and it is a real downgrade. Read the trade before choosing it.
+
+**What you give up.** The queue stops being a daemon and becomes a cron entry,
+so a notification that took a second to go out now takes up to five minutes.
+Verified backups are the bigger loss: `db:backup --verify` proves a dump reads
+back by restoring it into a scratch database, and a webspace account cannot
+create one. The command already degrades to a warning rather than failing, so
+you still get dumps — you simply stop getting the proof that they restore. For a
+system whose attendance records payroll is calculated from, that is worth
+weighing rather than waving through.
+
+**What you do not give up.** The dashboard, the API, reports, exports and the
+mobile app all behave identically. No feature is switched off.
+
+### The two platform limits
+
+| | |
+|---|---|
+| Minimum cron interval | 5 minutes |
+| Maximum runtime per cron run | 60 seconds, then killed |
+
+Both are worked around by `deploy/emp-webspace.cron`, which replaces **both**
+`deploy/emp-scheduler.cron` and `deploy/emp-worker.service`.
+
+The 5-minute floor costs nothing. Every task in `routes/console.php` already
+falls on a 5-minute boundary — `everyFifteenMinutes()` at :00/:15/:30/:45,
+`hourly()` at :00, and the four dailies at 01:30, 02:10, 06:45 and 10:30 — so a
+`*/5` cron fires `schedule:run` at every moment one of them is due. Nothing in
+the schedule was changed to fit this host, and nothing should be: moving a task
+off a 5-minute boundary would silently stop it running here while continuing to
+work on a VPS, which is the worst kind of difference to debug.
+
+The 60-second kill is why the queue entry carries `--max-time=50`. The worker
+retires cleanly and the next run continues; without it the platform kills it
+mid-job and the job stays reserved until it times out.
+
+### Steps
+
+Replace steps 1, 5, 6 and 7 above with the following. Steps 2, 3, 4, 8 and 9 are
+unchanged apart from dropping `sudo`.
+
+**1. There is nothing to install.** PHP and MySQL are provided. Confirm the CLI
+binary and its version — it is often *not* the same PHP the web server uses:
+
+```bash
+ssh -p 22 su1962887@access-XXXXXXXXXX.webspace-host.com
+which php8.3 || ls /usr/bin/php*
+php8.3 -v && php8.3 -m | grep -E 'gd|zip|mbstring|intl|bcmath'
+```
+
+`gd` and `zip` are what the Excel and PDF exports need. If they are missing,
+switch the PHP version in the hosting panel rather than trying to install them.
+
+**2. The database** is created in the hosting panel, not with `CREATE DATABASE`.
+Note the host it gives you — on webspace it is usually *not* `127.0.0.1` — and
+put that in `DB_HOST`. Skip the `vrfy\_%` grant; you cannot use it here.
+
+**5. TLS is issued from the panel**, not certbot. Point the domain's document
+root at the `public/` directory of the checkout. This is the one setting that
+must be right: a document root at the project directory serves `.env` and
+`storage/` to anyone who guesses the path.
+
+**6 and 7. Cron replaces both the scheduler and the worker.** Add the two
+entries from `deploy/emp-webspace.cron` through the panel's cron manager, and
+set the mode in `.env`:
+
+```
+HOSTING_MODE=managed
+```
+
+Without that line `emp:preflight` judges the install as though a daemon were
+running and fails the queue check the moment a job waits more than five
+minutes — which on a five-minute cron is simply Tuesday. With it, the tolerance
+becomes fifteen minutes, which absorbs a missed run, and the remediation text
+names the cron entry instead of telling you to run `systemctl` on a host that
+has no systemd.
+
+**8. Verify** exactly as above. `deploy.sh` detects that it is not running as
+root and skips the `chown` and the `sudo` prefixes on its own, so it is:
+
+```bash
+bash deploy/deploy.sh
+```
+
+Preflight will still warn that backups are unverified. That warning is correct
+and should stay visible — it is the standing reminder of what this host costs
+you.
+
+---
+
 ## 9. Shipping a new revision
 
 ```bash
-cd /var/www/hrms-repo
+cd /var/www/emp-repo
 sudo bash deploy/deploy.sh
 ```
 
@@ -352,8 +489,8 @@ trusted.
 
 **It works out where it is.** The repository root and the application are the same
 directory on the layout above, but on a panel host the site sits at `<domain>/` and
-the application at `<domain>/hrms`, because the web root has to point at
-`hrms/public`. Both are detected, so the command is the same either way. The file
+the application at `<domain>/emp`, because the web root has to point at
+`emp/public`. Both are detected, so the command is the same either way. The file
 owner is read off the checkout rather than assumed to be `www-data` — deploying as
 root otherwise leaves root-owned caches that PHP-FPM cannot write, which shows up
 as a 500 with nothing in the log.
@@ -375,7 +512,7 @@ the script.
 
 **Backups leave the server.** `db:backup --verify` proves the dump restores, but
 it writes to the same machine. A server that dies takes its backups with it, so
-copy `/var/backups/hrms` off-box nightly — object storage, or `rsync` to another
+copy `/var/backups/emp` off-box nightly — object storage, or `rsync` to another
 host.
 
 **The database dump is not the whole backup.** Uploaded files live on disk, not
@@ -392,14 +529,14 @@ location. Restoring one without the other leaves the system quietly wrong.
 
 **`public/storage` must exist.** The deploy script runs `storage:link`, but if
 the symlink is ever lost every employee photo 404s with nothing in the log and
-no error on screen — the pictures simply stop appearing. `hrms:preflight` checks
+no error on screen — the pictures simply stop appearing. `emp:preflight` checks
 for it.
 
 **Watch these:**
 
 ```bash
-tail -f /var/www/hrms/storage/logs/laravel-$(date +%F).log
-sudo journalctl -u hrms-worker -f
+tail -f /var/www/emp/storage/logs/laravel-$(date +%F).log
+sudo journalctl -u emp-worker -f
 php artisan queue:failed
 ```
 

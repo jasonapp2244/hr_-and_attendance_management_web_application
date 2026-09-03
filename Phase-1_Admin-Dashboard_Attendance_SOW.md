@@ -1,7 +1,7 @@
 # Phase 1 — Admin Web Dashboard (Attendance Focus)
 ### Scope of Work, Technical Plan & Delivery Report
 
-**Project:** HR & Attendance Management Application
+**Project:** Employment Management Portal
 **Prepared For:** Alfonzo
 **Phase:** 1 of N — *Admin Web Dashboard*
 **Primary Module:** Attendance Management
@@ -13,7 +13,7 @@
 
 ## ✅ BUILD STATUS — Phase 1 Delivered
 
-Phase 1 is **built, running and verified** in the `hrms/` folder.
+Phase 1 is **built, running and verified** in the `emp/` folder.
 
 | Item | Status |
 |---|---|
@@ -29,9 +29,9 @@ Phase 1 is **built, running and verified** in the `hrms/` folder.
 **Scale delivered:** 9 database models · 14 controllers · 15 migrations · 28 screens · 16 permissions.
 All pages return HTTP 200 and were verified end-to-end against seeded demo data.
 
-**How to run:** start MySQL (XAMPP Control Panel) → `cd hrms && php artisan serve` →
-open `http://127.0.0.1:8000` → log in as `admin@hrms.test` / `password`
-(HR demo account: `hr@hrms.test` / `password`).
+**How to run:** start MySQL (XAMPP Control Panel) → `cd emp && php artisan serve` →
+open `http://127.0.0.1:8000` → log in as `admin@emp.test` / `password`
+(HR demo account: `hr@emp.test` / `password`).
 
 > ### ⚠️ Two scope changes since the original document
 > **1. QR attendance was removed entirely** at your request on **2026-07-20** and replaced with a
@@ -45,7 +45,7 @@ open `http://127.0.0.1:8000` → log in as `admin@hrms.test` / `password`
 
 ## 1. Purpose of This Phase
 
-This document defines **Phase 1** of the larger HR & Attendance project. Rather than building the
+This document defines **Phase 1** of the larger Employment Management Portal project. Rather than building the
 Android/iOS apps first, Phase 1 delivers a **web-based Admin Dashboard** with the **Attendance
 module** as the core focus.
 

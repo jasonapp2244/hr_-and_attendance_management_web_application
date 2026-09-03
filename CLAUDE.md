@@ -1,6 +1,6 @@
-# HR & Attendance Management — working notes
+# Employment Management Portal — working notes
 
-Laravel 12 + MySQL web dashboard in `hrms/`, Flutter client in `mobile/`, both on
+Laravel 12 + MySQL web dashboard in `emp/`, Flutter client in `mobile/`, both on
 the same API. This file is for whoever picks the project up next. It records the
 things that are **not** obvious from reading the code, and the traps that have
 already cost time.
@@ -13,7 +13,7 @@ MySQL must be started **from the XAMPP Control Panel** — launching `mysqld.exe
 as a background task does not persist, it exits.
 
 ```bash
-cd hrms
+cd emp
 php artisan serve            # http://127.0.0.1:8000
 php artisan test             # 874 tests, ~90s, SQLite in memory
 ```
@@ -24,7 +24,7 @@ time comes from `Company::tz()`. "Fixing" it to a local zone would shift what
 
 ### Signing in locally
 
-The old `admin@hrms.test / password` **no longer exists**. Switch on the demo
+The old `admin@emp.test / password` **no longer exists**. Switch on the demo
 panel instead — it puts one-click role buttons on the login page:
 
 ```
@@ -32,7 +32,7 @@ DEMO_QUICK_LOGIN=true
 DEMO_QUICK_LOGIN_ACCOUNTS="test.admin@local.test:...,test.hr@local.test:..."
 ```
 
-It is forced off when `APP_ENV=production`, and `hrms:preflight` fails a deploy
+It is forced off when `APP_ENV=production`, and `emp:preflight` fails a deploy
 that still has it on.
 
 ### Browser testing
@@ -175,7 +175,7 @@ demote an existing administrator either.
 
 The web dashboard is **complete except for four deliberate omissions**. The
 mobile app and the API are done. `Feature-List_Web-and-App.md` is the live status
-board — read it first — and `hrms/config/roadmap.php` drives the phase panel on
+board — read it first — and `emp/config/roadmap.php` drives the phase panel on
 the Settings screen.
 
 **Not built, by decision:**
@@ -208,8 +208,8 @@ the Settings screen.
 
 - `Deployment-Guide_Production.md` — the runbook.
 - `deploy/` — nginx config, the systemd worker unit, the cron line, `deploy.sh`.
-- `hrms/.env.production.example` — the env template.
-- `php artisan hrms:preflight` — gates a deploy. Fails on debug-on,
+- `emp/.env.production.example` — the env template.
+- `php artisan emp:preflight` — gates a deploy. Fails on debug-on,
   `MAIL_MAILER=log`, a localhost or http `APP_URL`, the sync queue, no recent
   backup, a bad company timezone, the demo panel left on, and seeded passwords.
 

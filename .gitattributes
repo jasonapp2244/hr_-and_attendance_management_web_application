@@ -3,7 +3,7 @@
 # CRLF fails on Linux with "bad interpreter: /bin/bash^M", and systemd and cron
 # are similarly unforgiving about the trailing carriage return.
 #
-# hrms/ has its own .gitattributes (Laravel's) which does not reach up here.
+# emp/ has its own .gitattributes (Laravel's) which does not reach up here.
 deploy/*            text eol=lf
 deploy/deploy.sh    text eol=lf
 *.sh                text eol=lf

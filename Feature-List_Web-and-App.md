@@ -1,6 +1,6 @@
-# HR & Attendance Management — Master Feature List (Web + Mobile App)
+# Employment Management Portal — Master Feature List (Web + Mobile App)
 
-**Project:** HR & Attendance Management Application
+**Project:** Employment Management Portal
 **Prepared for:** Alfonzo
 **Stack:** Laravel 12 + MySQL · Blade/Bootstrap (SmartHR) web · Flutter app on the same Laravel API
 **Date:** 2026-08-04
@@ -288,10 +288,10 @@ the app is entirely usable in that state.*
 | C1.11 | Automated test suite (feature + unit) | ✅ 908 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import and preflight |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
-| C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `hrms:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
+| C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
 | C1.15 | Push delivery to handsets (FCM v1) | ✅ channel alongside database and mail; silent until a service-account key is configured; deletes handsets FCM reports UNREGISTERED, keeps ones that merely 503'd |
 | C1.16 | Public privacy policy + account-deletion pages | ✅ no login required — both stores demand it before an app with accounts is listed |
-| C1.17 | Real-install setup, no demo data | ✅ `hrms:install` creates the company and first admin, or attaches an admin to an existing company (`--company-id`); validated timezone, roles seeded, one transaction. `db:seed` now makes roles only. `hrms:purge-demo --dry-run` clears a seeded database and names the real rows the cascade would take with it |
+| C1.17 | Real-install setup, no demo data | ✅ `emp:install` creates the company and first admin, or attaches an admin to an existing company (`--company-id`); validated timezone, roles seeded, one transaction. `db:seed` now makes roles only. `emp:purge-demo --dry-run` clears a seeded database and names the real rows the cascade would take with it |
 
 ---
 
@@ -363,6 +363,6 @@ stays silent until a Firebase project exists.
 
 ---
 
-*Updated 2026-08-07 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-08-07 from the live codebase — `emp/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*

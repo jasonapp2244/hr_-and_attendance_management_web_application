@@ -1,7 +1,7 @@
 # Store submission — Google Play & App Store
 
 What the two stores require, what the repository already satisfies, and what is
-left. Written against the app in `mobile/` and the Laravel server in `hrms/`.
+left. Written against the app in `mobile/` and the Laravel server in `emp/`.
 
 The **blocking** item is not on this list: none of it can be submitted until the
 server is deployed at a real HTTPS domain (`C1.14`). Both stores fetch the
@@ -14,8 +14,8 @@ rejected without a human looking at it. See `Deployment-Guide_Production.md`.
 
 | Requirement | Where |
 |---|---|
-| Privacy policy at a public URL, no login | `GET /privacy` — `hrms/resources/views/legal/privacy.blade.php` |
-| Account-deletion route, no login | `GET /account-deletion` — `hrms/resources/views/legal/deletion.blade.php` |
+| Privacy policy at a public URL, no login | `GET /privacy` — `emp/resources/views/legal/privacy.blade.php` |
+| Account-deletion route, no login | `GET /account-deletion` — `emp/resources/views/legal/deletion.blade.php` |
 | Both reachable from inside the app | Profile screen → Privacy policy / Delete my account |
 | Real launcher icon, all densities | `mobile/android/.../mipmap-*`, `mobile/ios/.../AppIcon.appiconset` |
 | Adaptive icon (Android 8+) | `mipmap-anydpi-v26/ic_launcher.xml` + `values/colors.xml` |
