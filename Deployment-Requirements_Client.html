@@ -97,8 +97,8 @@
 
   <div class="banner">
     <b>The web dashboard is finished and tested.</b> What remains is not development — it is a
-      server, a domain and a mail account. This page lists exactly what is needed, who
-      provides each item, and what it costs.
+      hosting account and a mail account. The domain is already settled. This page lists
+      exactly what is needed, who provides each item, and what it costs.
   </div>
 
   <!-- ============================================================ -->
@@ -195,20 +195,20 @@
       </tr>
       <tr>
         <td class="n">2</td>
-        <td><b>Server (VPS)</b></td>
-        <td>Runs the application, the database, the background worker and the scheduler.
-            A VPS rather than shared hosting: the reminders, auto-close, nightly backups
-            and scheduled reports all need real cron and a long-running process, which
-            shared hosting generally does not provide.</td>
-        <td>~$7–20 / month</td>
+        <td><b>Hosting (managed webspace)</b></td>
+        <td>Runs the application, the database and the background jobs. Managed webspace
+            has been chosen over a VPS, so the reminders, auto-close, nightly backups and
+            scheduled reports are driven by the hosting panel's scheduled tasks rather
+            than by a process that runs continuously. See the note below the table.</td>
+        <td>~$4–10 / month</td>
         <td class="mid"><span class="pill you">Client</span></td>
       </tr>
       <tr>
         <td class="n">3</td>
         <td><b>HTTPS certificate</b></td>
-        <td>Attendance records include names and locations. Free via Let's Encrypt and
-            renewed automatically — there is no cost, but it must be issued for your
-            domain once the server exists.</td>
+        <td>Attendance records include names and locations. Free and renewed automatically,
+            issued from the hosting control panel rather than bought — but it has to be
+            switched on for the subdomain before staff can sign in.</td>
         <td>Free</td>
         <td class="mid"><span class="pill us">Us</span></td>
       </tr>
@@ -229,10 +229,22 @@
     figures depend on the provider and plan you choose.
   </p>
 
+  <p class="note">
+    <b>What managed webspace costs you, in behaviour rather than money.</b> Every feature
+    works and nothing is switched off, but two things are weaker than on a VPS. A
+    notification — a leave decision, a password reset — goes out within about five
+    minutes instead of within a second, because the hosting panel will not run a task
+    more often than that. And the nightly backup is still taken, but it can no longer be
+    automatically test-restored to prove it reads back, because that needs a spare
+    database the plan does not provide; the dumps should therefore be restored by hand
+    once before go-live and periodically after. Moving to a VPS later reverses both, and
+    is a change of host rather than a change of software.
+  </p>
+
   <div class="banner warn">
-    <b>Minimum to go live:</b> items 1, 2 and 4 — a domain, a small VPS and an email
-    account. Item 3, the certificate, is free and issued by us once the domain points at
-    the server.
+    <b>Minimum to go live:</b> items 2 and 4 — the webspace and an email account. Item 1,
+    the domain, is done: <code>emp.klutchcleaning.com</code> exists and already points at
+    the webspace. Item 3, the certificate, is free and switched on by us from the panel.
   </div>
 
   <!-- ============================================================ -->
@@ -246,10 +258,10 @@
     <tbody>
       <tr><td class="n">1</td><td><span class="bx"></span> Domain name</td>
           <td>Settled: <code>emp.klutchcleaning.com</code></td><td><span class="ln"></span></td></tr>
-      <tr><td class="n">2</td><td><span class="bx"></span> Server access</td>
-          <td>Root SSH details for the VPS once purchased</td><td><span class="ln"></span></td></tr>
+      <tr><td class="n">2</td><td><span class="bx"></span> Hosting access</td>
+          <td>Control panel sign-in, plus the SSH or SFTP details the plan provides</td><td><span class="ln"></span></td></tr>
       <tr><td class="n">3</td><td><span class="bx"></span> DNS control</td>
-          <td>Ability to point the domain at the server's IP address</td><td><span class="ln"></span></td></tr>
+          <td>Done — the subdomain already resolves to the webspace</td><td><span class="ln"></span></td></tr>
       <tr><td class="n">4</td><td><span class="bx"></span> SMTP credentials</td>
           <td>Host, port, username, password, and the "from" address</td><td><span class="ln"></span></td></tr>
       <tr><td class="n">5</td><td><span class="bx"></span> Company details</td>
@@ -275,18 +287,22 @@
       <tr><th class="n">#</th><th style="width:30%">Step</th><th>What it does</th></tr>
     </thead>
     <tbody>
-      <tr><td class="n">1</td><td>Server preparation</td>
-          <td>Install the web server, PHP, MySQL and supporting packages.</td></tr>
+      <tr><td class="n">1</td><td>Hosting preparation</td>
+          <td>Confirm the PHP version and its extensions, and point the subdomain at the
+              application's public folder — never at the folder above it, which would
+              publish the configuration file.</td></tr>
       <tr><td class="n">2</td><td>Database and code</td>
           <td>Create the database, deploy the application, build the schema.</td></tr>
       <tr><td class="n">3</td><td>Domain and HTTPS</td>
-          <td>Point the domain at the server and issue the certificate. From here the
-              site is reachable at your own address, over an encrypted connection.</td></tr>
+          <td>Switch on the certificate for <code>emp.klutchcleaning.com</code>, which
+              already resolves. From here the site is reachable at your own address, over
+              an encrypted connection.</td></tr>
       <tr><td class="n">4</td><td>Email</td>
           <td>Connect the mail account and send a live test.</td></tr>
       <tr><td class="n">5</td><td>Background jobs</td>
-          <td>Start the scheduler and the queue worker — these run the reminders,
-              the end-of-day close, the nightly verified backup and the scheduled reports.</td></tr>
+          <td>Add the two scheduled tasks that run the reminders, the end-of-day close,
+              the nightly backup and the scheduled reports. On this hosting they fire
+              every five minutes rather than continuously.</td></tr>
       <tr><td class="n">6</td><td>Company setup</td>
           <td>Create the company and the first administrator, set the timezone and the
               working week, and import the employee list if one is supplied.</td></tr>
