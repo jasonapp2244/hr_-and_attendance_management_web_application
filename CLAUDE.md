@@ -1,9 +1,9 @@
-# Employment Management Portal — working notes
+# Klutch Cleaning — Employment Management Portal (EMP)
 
-Laravel 12 + MySQL web dashboard in `emp/`, Flutter client in `mobile/`, both on
-the same API. This file is for whoever picks the project up next. It records the
-things that are **not** obvious from reading the code, and the traps that have
-already cost time.
+Working notes. Laravel 12 + MySQL web dashboard in `hrms/`, Flutter client in
+`mobile/`, both on the same API. This file is for whoever picks the project up
+next. It records the things that are **not** obvious from reading the code, and
+the traps that have already cost time.
 
 ---
 
@@ -13,7 +13,7 @@ MySQL must be started **from the XAMPP Control Panel** — launching `mysqld.exe
 as a background task does not persist, it exits.
 
 ```bash
-cd emp
+cd hrms
 php artisan serve            # http://127.0.0.1:8000
 php artisan test             # 874 tests, ~90s, SQLite in memory
 ```
@@ -131,6 +131,27 @@ nothing. Log out explicitly, or build the fixture without authenticating.
   match `headings` exactly or the exports throw.
 - **The API-docs test walks the route table.** A new endpoint fails the suite
   until it is written up in `API-Reference_v1.md`. That is deliberate.
+- **`APP_NAME` is the long string in the title above**, and it lives in `.env`,
+  which is gitignored. Only `hrms/.env.production.example` carries it in the
+  repository, so an install that skips it reads "Laravel" everywhere. It is also
+  the TOTP issuer: changing it relabels **new** 2FA enrolments only — existing
+  ones keep the old label and keep working, because the shared secret is
+  untouched.
+- **`MAIL_FROM_NAME` must not inherit `${APP_NAME}`.** It used to, which was
+  fine while the name was one short phrase. It now fills the From column of
+  every inbox with the full product title. Set it by hand to `Klutch Cleaning`.
+- **`App\Support\SqlDumper` must stay free of the container.** `SqlDumperTest`
+  is a plain `PHPUnit\TestCase` with no application booted, so a `config()` call
+  anywhere in that class dies with *Target class [config] does not exist* and
+  takes three backup tests with it. The product name in the dump header is a
+  literal for exactly that reason, and a backup must not need a booted framework.
+- **The logo `<img>` tags carry explicit `width` and `height`.** The assets are
+  PNGs, and above 992px there is **no CSS width for `.logo img` at all** — the
+  old SVGs sized themselves through their intrinsic `width="250"`. Swap in an
+  asset without those attributes and it renders at natural size and blows the
+  sidebar open. `logo-small.png` is a black badge with the mark knocked out
+  white because it is the one element shown in *both* light and dark
+  mini-sidebar; the template has no dark variant for it.
 
 ---
 
@@ -175,7 +196,7 @@ demote an existing administrator either.
 
 The web dashboard is **complete except for four deliberate omissions**. The
 mobile app and the API are done. `Feature-List_Web-and-App.md` is the live status
-board — read it first — and `emp/config/roadmap.php` drives the phase panel on
+board — read it first — and `hrms/config/roadmap.php` drives the phase panel on
 the Settings screen.
 
 **Not built, by decision:**
@@ -208,7 +229,7 @@ the Settings screen.
 
 - `Deployment-Guide_Production.md` — the runbook.
 - `deploy/` — nginx config, the systemd worker unit, the cron line, `deploy.sh`.
-- `emp/.env.production.example` — the env template.
+- `hrms/.env.production.example` — the env template.
 - `php artisan emp:preflight` — gates a deploy. Fails on debug-on,
   `MAIL_MAILER=log`, a localhost or http `APP_URL`, the sync queue, no recent
   backup, a bad company timezone, the demo panel left on, and seeded passwords.
