@@ -13,7 +13,7 @@
 
 ## ✅ BUILD STATUS — Phase 1 Delivered
 
-Phase 1 is **built, running and verified** in the `emp/` folder.
+Phase 1 is **built, running and verified** in the `hrms/` folder.
 
 | Item | Status |
 |---|---|

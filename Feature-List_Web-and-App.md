@@ -363,6 +363,6 @@ stays silent until a Firebase project exists.
 
 ---
 
-*Updated 2026-08-07 from the live codebase — `emp/` and `mobile/` both read directly
+*Updated 2026-08-07 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
