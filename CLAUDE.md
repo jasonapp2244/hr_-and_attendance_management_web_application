@@ -15,7 +15,7 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 874 tests, ~90s, SQLite in memory
+php artisan test             # 1002 tests, ~125s, SQLite in memory
 ```
 
 `config('app.timezone')` is **deliberately UTC** and must stay that way. Per-company
@@ -162,10 +162,12 @@ Admin, HR, manager, employee — 18 permissions, all seeded by
 
 | | Admin | HR | Manager | Employee |
 |---|---|---|---|---|
-| Lands on | `/dashboard` | `/dashboard` | `/employee/dashboard` | `/employee/dashboard` |
+| Lands on | `/dashboard` | `/dashboard` | `/manager/dashboard` | `/employee/dashboard` |
 | Roles, policies, activity log, settings | ✅ | ❌ | ❌ | ❌ |
 | Employees, reports, leave register | ✅ | ✅ | ❌ | ❌ |
-| Team approvals tab | — | — | ✅ | ❌ |
+| Own team: dashboard, attendance, roster, reports | — | — | ✅ | ❌ |
+| Team approvals | — | — | ✅ | ❌ |
+| Clocks in through the portal | ❌ | ❌ | ✅ | ✅ |
 
 **`manager` is a role *and* a relationship, and both must line up.** The role
 grants the gate; `employees.manager_id` decides the scope. Role but no reports →
@@ -175,6 +177,65 @@ The admin app is wrapped in `role:admin|hr`, which runs **before** any
 `permission:` middleware on the route inside it. Adding `|approve-leave` to a
 route in that group advertises manager access that can never be reached — the
 manager holds the permission but not the role.
+
+### The manager area (`/manager/*`)
+
+A parallel route group, **not** part of the admin app, for exactly the reason
+above: `role:admin|hr` refuses a manager at the door whatever permission they
+hold, so the only way the role can be reached is a group of its own. Gated
+`role:manager` **and** `permission:view-team` — the role decides who is in, the
+permission decides whether the area exists at all, so the roles editor can
+withdraw it without anybody editing the route table. (`view-team` was seeded
+from the start and wired to nothing until this area existed.)
+
+Neither gate knows *whose* team. That is **`App\Services\ManagerScope`**, and
+every manager query goes through it:
+
+```php
+$this->scope->team($manager)            // active direct reports, ordered
+$this->scope->teamIds($manager)         // ids, for the whereIn
+$this->scope->assertManages($m, $emp)   // 403 unless they report to $m
+```
+
+**The scope is direct reports only, and does not recurse.** Leave approval is a
+single hop — manager, then HR — which is what `LeaveService::managerApprove`
+models, so a manager two levels up is not in the chain and showing them those
+records would hand them data they can never act on. Subtree visibility is a
+different feature and belongs to whoever also changes the approval chain.
+
+No new tables were added: `employees.manager_id` already carries the reporting
+line. A manager↔office or manager↔department pivot would be a second claim on
+the same fact, and the two would eventually disagree about who owns whom.
+
+Managers are **read-only** outside approvals — deliberately, not by omission:
+
+- Correcting a punch is `manage-attendance`; attendance is append-only and every
+  write records an actor. The routes back are the employee's regularisation
+  request (A4.13) or HR's correction screen (A4.12), both of which leave a trail.
+- Planning the roster is `manage-shifts`. One planner, one publish step.
+- Exporting is `export-reports`. The manager reports print instead.
+- The HR-grade PII on an employee record — national ID, home address, date of
+  birth, emergency contact, the document vault — is behind `manage-employees`
+  and never rendered in `/manager`. A supervisor needs to know who is on shift.
+
+**Two shells, one approvals inbox.** `LeaveApprovalController` serves both
+`employee.approvals.index` and `manager.approvals.index`; the view picks its
+layout from a `$layout` variable. The approve/reject **writes stay on the portal
+routes only** — one write path, already scoped, rather than two places for that
+check to be forgotten.
+
+**`homeRoute()` now has three answers, and `landing()` must not assume two.**
+It used to compare against `'employee.dashboard'` and send everything else to
+`route('dashboard')`, which sent managers somewhere `role:admin|hr` refuses — a
+sign-in ending in a 403. `landing()` tests the roles directly now. An admin who
+also manages a team lands on `/dashboard`: the bigger screen wins.
+
+**`shiftOn()` is roster-aware but *not* publish-aware.** It reads
+`shift_assignments` directly, so it will happily return an unpublished draft's
+shift. Anything whose contract is "published only" — the team roster, the app's
+`/team/roster` — must fall back to `$employee->shift` (the standing shift) when
+there is no *published* assignment, never to `shiftOn()`. That leaked a draft
+shift's name onto the roster before it was caught.
 
 **Every mobile API call needs an employee record.** `ApiController::employee()`
 aborts 403 "No employee record is linked to this account". A hand-created admin

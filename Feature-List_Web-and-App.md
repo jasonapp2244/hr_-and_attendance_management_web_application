@@ -16,7 +16,7 @@
 | # | Feature | Status |
 |---|---|---|
 | A1.1 | Secure login / logout (Laravel session) | ✅ |
-| A1.2 | Role-based access — Admin, HR, Employee (Spatie RBAC) | ✅ |
+| A1.2 | Role-based access — Admin, HR, Manager, Employee (Spatie RBAC) | ✅ four roles, each landing on the only area it can reach. Manager is a first-class role with its own dashboard (A10), not a permission bolted onto the employee portal |
 | A1.3 | Granular permissions per role (18 seeded) | ✅ |
 | A1.4 | Roles & permissions editor UI | ✅ |
 | A1.5 | Profile page + change password | ✅ |
@@ -152,6 +152,37 @@ absence against working days only. Weekends and company holidays count as neithe
 | A9.5 | Schedule update alerts | ✅ publishing a roster tells each affected employee once, covering the whole range rather than one message per day. In-app, email and push |
 | A9.6 | Missing-checkout reminder | ✅ sent once, a configurable grace after the shift ends |
 
+## A10. Manager Workspace *(team leads)*
+
+> A parallel area at `/manager/*`, gated `role:manager` **and**
+> `permission:view-team`. Not part of the admin app: that group is wrapped in
+> `role:admin|hr`, which refuses a manager whatever permission they hold, so the
+> role can only be reached by a group of its own.
+>
+> Scope is `employees.manager_id` — **direct reports only**, resolved by
+> `App\Services\ManagerScope`, which every query goes through. No new tables:
+> the reporting line already existed. Leave approval is a single hop (manager →
+> HR), so the scope deliberately does not recurse down the tree.
+>
+> Managers are read-only outside approvals. Correcting attendance is
+> `manage-attendance`, planning the roster is `manage-shifts`, exporting is
+> `export-reports`, and HR-grade PII sits behind `manage-employees` — none of
+> which this role holds, and none of which this area asks for.
+
+| # | Feature | Status |
+|---|---|---|
+| A10.1 | Manager dashboard — team, today, and what needs deciding | ✅ tiles (team, on the clock, present, late, on leave, unaccounted), leave and swaps waiting on *this* manager, missing clock-outs from finished days, 7-day published coverage with unplanned working days flagged, today's team list and recent punches. Every figure counted from real rows; nothing is placeholder |
+| A10.2 | Team list + search | ✅ direct reports with today's status, shift and worked hours; searchable by name, code or department |
+| A10.3 | Team member detail | ✅ employment facts, leave balances, upcoming published shifts, 30 days of attendance and leave history. Personal PII deliberately excluded |
+| A10.4 | Team attendance board (any past date) | ✅ same status vocabulary as the employee's own history and the app — one `dayStatus`, so nobody reads two different words for one day |
+| A10.5 | Team punch log | ✅ filterable by person, date, type and status. An employee id outside the team narrows to nothing rather than reaching past the scope |
+| A10.6 | Team schedule (published roster) | ✅ fortnight grid, leave outranking a rostered shift, drafts invisible exactly as they are to staff |
+| A10.7 | Team approvals inbox | ✅ the existing controller in the manager shell; leave and shift swaps, with clashes flagged. Writes stay on the one portal endpoint |
+| A10.8 | Team-scoped reports | ✅ Late Arrivals, Overtime and Weekly Rollup through the same `ReportService` and the same results partial the HR reports use, handed the team as an id list. Print only — no PDF/Excel, which is `export-reports` |
+| A10.9 | Manager notifications | ✅ already routed by `NotificationService::approversFor` — a request awaiting a manager goes to that manager. No new events, deliberately: a notification per punch would be spam |
+| A10.10 | Manager role on mobile | ✅ no change needed — the app derives manager mode from `permissions`, which `/auth/me` already returns, and `/team/attendance` and `/team/roster` are unchanged |
+| A10.11 | Roster editing / attendance correction by managers | ⬜ by decision — see the note above |
+
 ---
 
 # PART B — MOBILE APP (Android + iOS, Employee-facing)
@@ -285,7 +316,7 @@ the app is entirely usable in that state.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 908 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import and preflight |
+| C1.11 | Automated test suite (feature + unit) | ✅ 1002 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
@@ -325,7 +356,8 @@ the app is entirely usable in that state.*
 | **Stage 9** | A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3 | ✅ Photos, the document vault, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest |
 | **Stage 10** | A3.12, A4.11, A8.4–A8.6, A9.5 | ✅ Dashboards per role and per person, week-on-week trends, weekly rollups, schedule alerts and on/offboarding checklists |
 | **Stage 11** | B7 — Manager mode in the app | ✅ Team roster added; approvals and team attendance already shipped |
-| **Stage 12** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
+| **Stage 12** | A10 — Manager workspace on the web | ✅ The manager promoted from a tab on the employee portal to a first-class role with its own area, dashboard, team screens, scoped reports and approvals inbox. One scope service, no new tables, no mobile change |
+| **Stage 13** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
 
 ### The one thing gating the rest
 
@@ -340,22 +372,24 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 82 | 9 | 3 | 94 |
+| Web Dashboard (A) | 92 | 9 | 4 | 105 |
 | Mobile App (B) | 20 | 5 | 19 | 44 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **117** | **16** | **29** | **162** |
+| **Total** | **127** | **16** | **30** | **173** |
 
-**The web dashboard is complete, AI excluded.** Stages 8, 9, 10 and 11 are all
-delivered. Three planned rows and nine partial ones remain across Part A, and none
+**The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
+delivered. Four planned rows and nine partial ones remain across Part A, and none
 of them blocks a production deployment. The AI assistant (Part D) is deliberately
 out of scope.
 
 **Still open, and worth being explicit about:** multi-company tenancy (A2.10), a
 conditional rules engine (A2.9, A6.6), a drag-and-drop roster planner (A5.8), a
-per-shift break policy builder (A5.7), a team leave calendar in the app (B4.6),
-biometrics and offline punching (B1.3, B2.4, B6.3), and a QR image on the 2FA
-setup screen — the key can be typed in, which every authenticator supports.
+per-shift break policy builder (A5.7), roster editing and attendance correction
+by managers (A10.11 — held with `manage-shifts` and `manage-attendance` on
+purpose), a team leave calendar in the app (B4.6), biometrics and offline
+punching (B1.3, B2.4, B6.3), and a QR image on the 2FA setup screen — the key can
+be typed in, which every authenticator supports.
 
 **Two things are code-complete but inert until configured**, and neither is a
 code change: `MAIL_MAILER` is still `log`, so no email leaves the box; and push
