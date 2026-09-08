@@ -218,7 +218,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | # | Feature | Status |
 |---|---|---|
 | B3.1 | View own profile & employment details | ✅ |
-| B3.2 | Edit permitted fields (phone, address, emergency contact) | ⬜ `PUT /profile` exists; the app never calls it |
+| B3.2 | Edit permitted fields (phone, address, emergency contact) | 🟡 name and phone edit from the Profile tab through `PUT /profile`, which had existed unused since the API shipped. **The sign-in address is shown but not editable, deliberately** — changing it is account takeover in two steps (set it to your own, then "forgot password"), and it would need nothing but an unlocked phone; changing the *password* already demands the current one for that reason. Address and emergency contact live on `employees` and have no endpoint at all — a server change, not an app one |
 | B3.3 | Change password | ✅ |
 | B3.4 | Attendance history with monthly calendar view | 🟡 day rows over 7/30/92 days; no calendar grid |
 | B3.5 | Personal attendance score / on-time streak | 🟡 present/late/leave/absent/worked totals; no score or streak |
@@ -262,7 +262,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B5.1 | Clock-in reminder at shift start | ⬜ no server job either |
 | B5.2 | Clock-out reminder at shift end | ✅ end to end; needs credentials to leave the box |
 | B5.3 | Leave approved / rejected | ✅ end to end, both stages of the approval chain |
-| B5.4 | Schedule / roster updated | 🟡 **not blocked on A9.5 — that shipped, push included.** `ScheduleUpdated::via()` lists `fcm` and `toFcm()` sends `route: schedule`, so the message goes out with B5.2 and B5.3. The app's `PushRoute` enum knows only `clock`, `leave` and `approvals`, so `parse()` returns null and the tap opens the app instead of the Schedule tab — which exists and is labelled that. One enum row from done |
+| B5.4 | Schedule / roster updated | ✅ end to end. A9.5 had been sending `route: schedule` over FCM since it shipped; the app's `PushRoute` enum knew only `clock`, `leave` and `approvals`, so every roster notification arrived and then landed nowhere in particular. The enum row is added and the test now asserts one route per notification class on the server — the old one checked only the routes the app already knew, which is why it could never have caught this |
 | B5.5 | HR announcements & broadcasts | ⬜ |
 | B5.6 | In-app notification centre | 🟡 a snack bar for a message arriving with the app open; no history |
 
@@ -381,10 +381,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 20 | 10 | 15 | 45 |
+| Mobile App (B) | 21 | 10 | 14 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **127** | **21** | **26** | **174** |
+| **Total** | **128** | **21** | **25** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
