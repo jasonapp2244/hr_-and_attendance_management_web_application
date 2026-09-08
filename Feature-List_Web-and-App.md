@@ -37,7 +37,7 @@
 | A2.6 | General settings page | ✅ |
 | A2.7 | Company holiday calendar | ✅ |
 | A2.8 | Weekend / working-days configuration per office | ✅ editable working week, company-level — the same definition leave charging, absence and the roster all read. A seven-day week is expressible; a zero-day one is refused |
-| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout — but there is no conditional rule builder |
+| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout, directory contact details — but there is no conditional rule builder |
 | A2.10 | Multi-company (SaaS tenancy) support | ⬜ |
 
 ## A3. Employee Management
@@ -224,7 +224,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B3.5 | Personal attendance score / on-time streak | 🟡 present/late/leave/absent/worked totals; no score or streak |
 | B3.6 | View assigned shift & upcoming roster | ✅ published roster only |
 | B3.7 | Download own payslip / documents | 🟡 **server side done** — `GET /documents` lists the caller's own shelf of the vault (expiring first, with the same four `expiry_state` values the web badge uses) and `GET /documents/{id}` streams the file. Read-only, no employee id in either route, and `notes` and the uploader are withheld: notes is where HR records why a document is being chased. The Flutter screen is what remains. **No payslip** — there is no payroll module, only the hours export (A7.14) |
-| B3.8 | Company directory (colleagues, departments) | ⬜ no endpoint yet |
+| B3.8 | Company directory (colleagues, departments) | 🟡 **server side done** — `GET /directory`, searchable by name or code and filterable by department and office. Active staff of the caller's own company only. Contact details sit behind a new `directory_show_contact_details` policy, **off by default**: there is one phone column on an employee record, and where staff have no desk line it holds a personal mobile. Everything HR-grade — DOB, address, national ID, personal email, emergency contact, the reporting line — is never returned at any setting. The Flutter screen is what remains |
 | B3.9 | Raise an attendance correction | 🟡 **server side done** — `GET/POST /attendance/regularisations` and a cancel, employee-raises-only. The list ships the last 30 punches with their ids because `/attendance/history` answers in day-shaped rows and carries none, so without them the app cannot name the reading it disputes. The Flutter screen is what remains. Added as a row because Part B only ever tracked the *manager* half (B7.2), which left the employee half invisible |
 
 ## B4. Leave (app)
@@ -324,7 +324,7 @@ the app is entirely usable in that state.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 1050 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
+| C1.11 | Automated test suite (feature + unit) | ✅ 1066 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
@@ -381,10 +381,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 20 | 9 | 16 | 45 |
+| Mobile App (B) | 20 | 10 | 15 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **127** | **20** | **27** | **174** |
+| **Total** | **127** | **21** | **26** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none

@@ -897,7 +897,63 @@ change; nothing here needs to know they are special.
 
 ---
 
-## 11. Push devices
+## 11. Directory
+
+### `GET /directory`
+
+Who else works here (B3.8) — **the only endpoint that answers about other
+people**, and for that reason the one that carries the least.
+
+| Query | Notes |
+|---|---|
+| `q` | Matches first name, last name or employee code |
+| `department_id` | Narrows the same company-wide list |
+| `office_id` | As above |
+| `page` | 30 per page |
+
+Active staff of the caller's own company, ordered by name. Leavers are not
+listed: their record survives for the audit trail, not for finding somebody who
+still works here.
+
+```json
+{
+  "ok": true,
+  "people": [
+    { "id": 4, "employee_code": "E2", "full_name": "Bo Ray",
+      "designation": "Cleaner", "department": "Ops", "office": "Head Office",
+      "work_mode": "office", "photo_url": null }
+  ],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 30, "total": 1 },
+  "shows_contact_details": false
+}
+```
+
+**Contact details are a company policy, off by default.** With
+`directory_show_contact_details` switched on at `/settings/policies`, each person
+also carries `email` and `phone`:
+
+```json
+{ "…": "…", "email": "bo@acme.test", "phone": "+1 555 0134" }
+```
+
+It defaults off because there is a single phone column on an employee record,
+and for a workforce with no desk lines it holds personal mobiles — turning that
+on by default would publish every one of them to every colleague on an app
+update, which is not a disclosure that can be withdrawn afterwards.
+
+Read `shows_contact_details` rather than inferring from absent keys: the app has
+to tell "this company does not share contact details" from "this person has none
+on file", so it can hide a call button instead of showing a dead one.
+
+**Never returned, at any policy setting:** date of birth, home address, national
+id, blood group, personal email, emergency contact, hire date, employment
+status, documents, attendance, leave — and the reporting line. Those are behind
+`manage-employees`, and a *manager* does not see them for their own team; a
+colleague cannot see more than a manager.
+
+---
+
+## 12. Push devices
 
 Registration only. Nothing is delivered yet — notifications are Phase 5. The app
 can register from its first release so it does not need an update when they land.
@@ -934,7 +990,7 @@ the caller, so a token cannot be used to silence somebody else's phone.
 
 ---
 
-## 12. Client checklist
+## 13. Client checklist
 
 1. `GET /ping` before showing login, to distinguish "server down" from "wrong
    password".
