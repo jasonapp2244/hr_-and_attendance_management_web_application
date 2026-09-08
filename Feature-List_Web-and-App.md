@@ -223,7 +223,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B3.4 | Attendance history with monthly calendar view | 🟡 day rows over 7/30/92 days; no calendar grid |
 | B3.5 | Personal attendance score / on-time streak | 🟡 present/late/leave/absent/worked totals; no score or streak |
 | B3.6 | View assigned shift & upcoming roster | ✅ published roster only |
-| B3.7 | Download own payslip / documents | 🟡 **server side done** — `GET /documents` lists the caller's own shelf of the vault (expiring first, with the same four `expiry_state` values the web badge uses) and `GET /documents/{id}` streams the file. Read-only, no employee id in either route, and `notes` and the uploader are withheld: notes is where HR records why a document is being chased. The Flutter screen is what remains. **No payslip** — there is no payroll module, only the hours export (A7.14) |
+| B3.7 | Download own payslip / documents | ✅ `GET /documents` lists the caller's own shelf (expiring first, same four `expiry_state` values as the web badge) and `GET /documents/{id}` streams the file; **My documents** opens from the Profile tab, downloads through the token and hands the file to whatever the phone opens that type with. Saved to the *temporary* directory, not Documents — these are passport scans, and leaving copies where every other app can browse them would undo the point of an authenticated endpoint. `notes` and the uploader are withheld server-side. **No payslip** — there is no payroll module, only the hours export (A7.14) |
 | B3.8 | Company directory (colleagues, departments) | 🟡 **server side done** — `GET /directory`, searchable by name or code and filterable by department and office. Active staff of the caller's own company only. Contact details sit behind a new `directory_show_contact_details` policy, **off by default**: there is one phone column on an employee record, and where staff have no desk line it holds a personal mobile. Everything HR-grade — DOB, address, national ID, personal email, emergency contact, the reporting line — is never returned at any setting. The Flutter screen is what remains |
 | B3.9 | Raise an attendance correction | 🟡 **server side done** — `GET/POST /attendance/regularisations` and a cancel, employee-raises-only. The list ships the last 30 punches with their ids because `/attendance/history` answers in day-shaped rows and carries none, so without them the app cannot name the reading it disputes. The Flutter screen is what remains. Added as a row because Part B only ever tracked the *manager* half (B7.2), which left the employee half invisible |
 
@@ -381,10 +381,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 22 | 9 | 14 | 45 |
+| Mobile App (B) | 23 | 8 | 14 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **129** | **20** | **25** | **174** |
+| **Total** | **130** | **19** | **25** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
