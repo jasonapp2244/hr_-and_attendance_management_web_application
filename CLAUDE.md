@@ -15,7 +15,7 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1032 tests, ~150s, SQLite in memory
+php artisan test             # 1050 tests, ~110s, SQLite in memory
 ```
 
 `config('app.timezone')` is **deliberately UTC** and must stay that way. Per-company

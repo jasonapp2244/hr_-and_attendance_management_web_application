@@ -407,6 +407,87 @@ number for a stretch that was never closed.
 
 **Failures:** `invalid_range` (422) · `range_too_large` (422) · `validation_failed` (422)
 
+### Regularisation requests
+
+Asking for the record to be corrected (A4.13) — a punch that reads wrong, or one
+that should be there and isn't.
+
+**Raising only.** There is no approve or reject endpoint and there will not be
+one: approving voids a punch and writes a replacement, which is
+`manage-attendance` and lives on the web. **A manager has no step here.** Leave
+approval is manager-then-HR; a correction is HR's alone, so an approve button in
+the app's manager tab would advertise a stage that does not exist.
+
+Attendance is append-only. Nothing on this endpoint changes a punch — a request
+is inert until HR decides it, and the correction that follows goes through the
+same void-and-re-enter path HR uses by hand, so it carries the same audit trail.
+
+#### `GET /attendance/regularisations`
+
+| Query | Notes |
+|---|---|
+| `status` | `pending`\|`approved`\|`rejected`\|`cancelled` |
+| `page` | 15 per page |
+
+```json
+{
+  "ok": true,
+  "requests": [
+    { "id": 7, "type": "out", "work_date": "2026-08-03",
+      "requested_at": "2026-08-03T18:00:00-04:00",
+      "reason": "Left at 6pm but forgot to press check out",
+      "status": "pending", "challenges_a_punch": false,
+      "attendance_log_id": null, "can_cancel": true,
+      "submitted_at": "2026-08-04T09:12:00-04:00",
+      "decision_note": null, "decided_by": null, "decided_at": null }
+  ],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 15, "total": 1 },
+  "recent_punches": [
+    { "id": 109, "type": "in", "status": "late", "work_date": "2026-08-03",
+      "scanned_at": "2026-08-03T09:40:00-04:00", "time": "09:40 AM", "office": "Head Office" }
+  ]
+}
+```
+
+`recent_punches` is the last 30, newest first, and is why this list ships them:
+`/attendance/history` answers in day-shaped rows and carries no punch ids, so
+without it the app cannot name the reading it is disputing. Voided punches are
+never included — there is nothing to dispute about a reading already struck out.
+
+`decided_by` is the name recorded **on the row** at the moment of the decision,
+so it still reads correctly after that account is deleted.
+
+#### `POST /attendance/regularisations`
+
+| Field | Type | Notes |
+|---|---|---|
+| `attendance_log_id` | integer, optional | The punch being disputed. Omit to report one that is missing. |
+| `type` | `in`\|`out`, required | What the corrected punch should be. |
+| `requested_at` | date-time, required | The time it should read. |
+| `reason` | string, required, 5–500 | |
+
+Three rules beyond the shape, all shared with the portal form:
+
+- **No future times.** A correction to a moment that has not happened is refused
+  on `requested_at`.
+- **Only your own punches.** An `attendance_log_id` from somebody else's record
+  is refused on `attendance_log_id` — it is checked, never trusted.
+- **One open request per problem** — per punch, or per date-and-type where there
+  is no punch. Refused on `reason`. Without it a double submit produces two
+  approvals and two corrections for one problem.
+
+Returns **201** with the created request.
+
+#### `POST /attendance/regularisations/{id}/cancel`
+
+Withdraw one that is still pending. A decided request has already moved
+attendance; "cancelling" it afterwards would leave the correction standing with
+nothing on record explaining it, so it is refused on `status`.
+
+**Failures for all three:** `validation_failed` (422, including the three rules
+above) · `forbidden` (403, somebody else's request, or no employee record) ·
+`not_found` (404) · `too_many_requests` (429, the `write` limiter)
+
 ---
 
 ## 6. Leave
