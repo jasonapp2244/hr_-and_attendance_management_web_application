@@ -210,7 +210,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B2.3 | GPS capture at punch | ✅ `geolocator`, permission asked at the first punch; no fix, no permission or no signal sends the punch without coordinates |
 | B2.4 | Offline punch queue → auto-sync when back online | ⬜ |
 | B2.5 | Geofence-aware punch (warn or block outside office) | ⬜ optional |
-| B2.6 | Break in / break out | ⬜ needs A4.15 first |
+| B2.6 | Break in / break out | 🟡 **server side done** — `POST /attendance/break` wraps the same `recordBreak` the web portal's button has called since A4.15, and `/attendance/today` now carries `on_break`, `break_started_at`, `can_break` and `next_break_action`. The Flutter button is what remains. (The row read "needs A4.15 first" long after A4.15 shipped) |
 | B2.7 | Mock-location / rooted-device detection | ⬜ |
 | B2.8 | Home-screen widget / quick action for fast punching | ⬜ |
 
@@ -223,7 +223,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B3.4 | Attendance history with monthly calendar view | 🟡 day rows over 7/30/92 days; no calendar grid |
 | B3.5 | Personal attendance score / on-time streak | 🟡 present/late/leave/absent/worked totals; no score or streak |
 | B3.6 | View assigned shift & upcoming roster | ✅ published roster only |
-| B3.7 | Download own payslip / documents | ⬜ needs A3.8 |
+| B3.7 | Download own payslip / documents | ⬜ **not blocked on A3.8 — that shipped.** The vault holds the files on the private disk and streams them through the app rather than serving a URL, so the API needs a streaming endpoint of its own; there is none. No payslip either way — there is no payroll module, only the hours export (A7.14) |
 | B3.8 | Company directory (colleagues, departments) | ⬜ no endpoint yet |
 
 ## B4. Leave (app)
@@ -247,14 +247,21 @@ absence against working days only. Weekends and company holidays count as neithe
 > It is silent until somebody creates the Firebase project: no
 > `google-services.json` means no push, and the app builds and runs exactly as
 > before rather than failing. That console work, and the one Xcode capability
-> iOS needs, are the whole of what is left — see `Push-Notifications_Setup.md`.
+> iOS needs, are the whole of what is left for B5.2 and B5.3 —
+> see `Push-Notifications_Setup.md`.
+>
+> **`route` is a contract between two lists, and they have drifted.** The server
+> sends `clock`, `leave`, `approvals` *and* `schedule`; `PushRoute` in the app
+> parses the first three. An unknown key opens the app normally rather than
+> crashing it, which is why the gap was silent — see B5.4. Add a route on the
+> server, add its enum row, or the notification lands nowhere in particular.
 
 | # | Feature | Status |
 |---|---|---|
 | B5.1 | Clock-in reminder at shift start | ⬜ no server job either |
 | B5.2 | Clock-out reminder at shift end | ✅ end to end; needs credentials to leave the box |
 | B5.3 | Leave approved / rejected | ✅ end to end, both stages of the approval chain |
-| B5.4 | Schedule / roster updated | ⬜ needs A9.5 |
+| B5.4 | Schedule / roster updated | 🟡 **not blocked on A9.5 — that shipped, push included.** `ScheduleUpdated::via()` lists `fcm` and `toFcm()` sends `route: schedule`, so the message goes out with B5.2 and B5.3. The app's `PushRoute` enum knows only `clock`, `leave` and `approvals`, so `parse()` returns null and the tap opens the app instead of the Schedule tab — which exists and is labelled that. One enum row from done |
 | B5.5 | HR announcements & broadcasts | ⬜ |
 | B5.6 | In-app notification centre | 🟡 a snack bar for a message arriving with the app open; no history |
 
@@ -272,7 +279,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | # | Feature | Status |
 |---|---|---|
 | B7.1 | Team attendance today | ✅ present vs in-now reported separately |
-| B7.2 | Approve leave / regularisation from phone | ✅ leave only — regularisation needs A4.13 |
+| B7.2 | Approve leave / regularisation from phone | ✅ leave only. **Not blocked on A4.13 — that shipped**, but on the web, where HR approves; the API has no regularisation endpoint at all, so there is nothing for the app to call |
 | B7.3 | Team roster view | ✅ `GET /team/roster` plus a Roster tab in the app — a week per direct report, published days only, with leave outranking a rostered shift |
 
 *Built so far: sign-in with the token held in the device keystore, the clock screen
@@ -308,7 +315,7 @@ the app is entirely usable in that state.*
 |---|---|---|
 | C1.1 | **Laravel Sanctum token auth + `routes/api.php`** | ✅ |
 | C1.2 | `/auth/login`, `/auth/logout`, `/auth/me` (+ `logout-all`, `devices`) | ✅ |
-| C1.3 | `/attendance/check`, `/attendance/history`, `/attendance/today` | ✅ same AttendanceService as the web button — one set of punch rules |
+| C1.3 | `/attendance/check`, `/attendance/break`, `/attendance/history`, `/attendance/today` | ✅ same AttendanceService as the web button — one set of punch rules. `today` reads clocked-in state from `breakState`, not from the last punch: `break_end` is neither `in` nor `out`, so the old reading would have offered "Check In" to somebody who never left |
 | C1.4 | `/leave/*` endpoints | ✅ balances, apply, list, withdraw + the manager inbox — all via LeaveService |
 | C1.5 | `/schedule`, `/profile` endpoints | ✅ published roster only, leave/holiday/weekend aware; profile read + contact edit + password |
 | C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
@@ -316,7 +323,7 @@ the app is entirely usable in that state.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 1002 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
+| C1.11 | Automated test suite (feature + unit) | ✅ 1016 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
@@ -350,7 +357,7 @@ the app is entirely usable in that state.*
 | **Stage 3** | A9 + C1.9 — Notifications + scheduler | ✅ Built — `MAIL_MAILER` is still `log`, so no mail leaves the box |
 | **Stage 4** | A5.5–A5.9 — finish Shift & Schedule | ✅ Done — planner is a grid, not drag-and-drop |
 | **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | 🟡 **In progress — the screens work and punches now carry GPS; biometrics and offline are missing** |
-| **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code |
+| **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code. One code exception: B5.4's `route: schedule` is sent but not parsed by the app |
 | **Stage 7** | A4.12–A4.15, A7.10–A7.14 | ✅ Attendance depth + reporting — correction, regularisation, overtime, break punches, payroll export, leave reports, scheduled delivery, report builder |
 | **Stage 8** | A1.7–A1.9, A2.3, A2.8, A4.16 | ✅ 2FA, the security trail, the idle timeout, the working-week editor and geofence enforcement |
 | **Stage 9** | A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3 | ✅ Photos, the document vault, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest |
@@ -373,10 +380,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 20 | 5 | 19 | 44 |
+| Mobile App (B) | 20 | 7 | 17 | 44 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **127** | **16** | **30** | **173** |
+| **Total** | **127** | **18** | **28** | **173** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
@@ -395,8 +402,17 @@ be typed in, which every authenticator supports.
 code change: `MAIL_MAILER` is still `log`, so no email leaves the box; and push
 stays silent until a Firebase project exists.
 
+**Four app rows were marked blocked on web work that has since shipped**, and
+the notes have been corrected in place — B2.6, B3.7, B5.4 and B7.2. In every
+case the real gap turned out to be the same one: the web has the feature and the
+API never exposed it. B5.4 was the exception and is now 🟡 rather than ⬜ — the
+server does send that push; only the app's `PushRoute` enum has not heard of it.
+A row that names an *internal* dependency goes stale the day that dependency
+ships, and nothing fails when it does, so re-read these against the code rather
+than trusting the note.
+
 ---
 
-*Updated 2026-08-07 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-09-08 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*

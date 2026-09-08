@@ -15,7 +15,7 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1002 tests, ~125s, SQLite in memory
+php artisan test             # 1016 tests, ~140s, SQLite in memory
 ```
 
 `config('app.timezone')` is **deliberately UTC** and must stay that way. Per-company
@@ -97,6 +97,38 @@ in the model's `booted()`, not at call sites.
 
 A "signed out" assertion after an `actingAs` call is still signed in and asserts
 nothing. Log out explicitly, or build the fixture without authenticating.
+
+### 6. "Last punch" is not "clocked in"
+
+There are **four** punch types, not two. `break_start` and `break_end` are
+neither `in` nor `out`, so anything that reads the day's last row to decide
+whether somebody is on the clock treats a returning employee as one who went
+home — and the next press opens a second attendance stretch, losing the
+morning's pairing.
+
+`AttendanceService::record` gets this right by filtering to `whereIn('type',
+['in','out'])`. The API's `/attendance/today` did not: it shipped reading
+`$logs->last()`, so an employee who took a break on the web portal and then
+opened the app was offered "Check In" while still on the clock. Nothing failed;
+the screen was just wrong.
+
+**`breakState()` is the one definition** — it is what the live board uses, and
+what `today` uses now. Never re-derive this from a punch list.
+
+### 7. The punch cooldown measures `created_at`, not `scanned_at`
+
+`recentlyScanned()` compares `created_at` against `now()`. In a test that means
+**`travelTo` before writing the fixture punch, not after**: a row written at the
+real clock and then compared against a travelled `now()` is a negative diff,
+which reads as "within the cooldown", and every POST in the test returns 429
+`duplicate_scan`. Seven tests failed this way at once and the message points at
+the endpoint rather than the fixture.
+
+```php
+$this->travelTo(Carbon::parse('2026-08-03 09:00:00'));   // first
+$this->punch('in', '2026-08-03 09:00:00');
+$this->travelTo(Carbon::parse('2026-08-03 13:00:00'));   // then move on
+```
 
 ---
 

@@ -98,7 +98,7 @@ IP, so limiting on that would have one busy person throttle their colleagues.
 |---|---|---|
 | `api` | every endpoint | 120 / minute |
 | `login` | `POST /auth/login` | 5 / minute, per address **and** IP |
-| `punch` | `POST /attendance/check` | 20 / minute |
+| `punch` | `POST /attendance/check`, `POST /attendance/break` | 20 / minute |
 | `write` | every endpoint that creates or changes a record | 30 / minute |
 
 The stricter limiters stack on top of the ceiling. Every response carries
@@ -270,11 +270,55 @@ without it.
 against the shift rostered for that day.
 
 **Failures:** `duplicate_scan` (429, within the cooldown of the last punch) ·
-`no_office` (422) · `forbidden` (403, no employee record) ·
-`too_many_requests` (429, the `punch` limiter)
+`outside_geofence` (422) · `no_office` (422) · `forbidden` (403, no employee
+record) · `too_many_requests` (429, the `punch` limiter)
 
 Treat `duplicate_scan` as success from the user's point of view — the punch they
 wanted is already recorded.
+
+`outside_geofence` only ever appears for a company that has switched enforcement
+on (A4.16, off by default). Its `message` names the distance, so show it rather
+than a generic failure — "move closer" is the one thing the person can act on.
+A punch that arrives with no coordinates is never fenced, so refusing location
+permission does not lock anybody out.
+
+### `POST /attendance/break`
+
+Start or end a break. **The server decides which**, from the day's punches —
+same reasoning as `check`, and for the same reason.
+
+| Field | Type | Notes |
+|---|---|---|
+| `latitude` | numeric, optional, −90…90 | Recorded, never a gate. |
+| `longitude` | numeric, optional, −180…180 | As above. |
+
+```json
+{
+  "ok": true,
+  "punch": {
+    "id": 114, "type": "break_start", "status": "ontime",
+    "scanned_at": "2026-07-30T13:02:44-04:00", "time": "01:02 PM",
+    "office": "Head Office", "source": "mobile"
+  },
+  "on_break": true,
+  "next_break_action": "end",
+  "message": "Break started at 01:02 PM. Your worked time pauses until you return."
+}
+```
+
+`type` is `break_start` or `break_end`. `status` is always `ontime`: a break is
+neither early nor late, and reusing the punch statuses here would hang a
+meaningless "late" badge on somebody's lunch.
+
+A break is only available **on the clock**. Starting one while checked out, or
+ending one nobody started, is refused rather than guessed — an unpaired break
+marker has to be discarded by the hours calculation, so the button would appear
+to work while the total silently did not move. Read `can_break` from
+`/attendance/today` and grey the button instead of letting the tap fail.
+
+**Failures:** `break_not_available` (422, not clocked in) · `duplicate_scan`
+(429) · `no_office` (422) · `forbidden` (403) · `too_many_requests` (429, the
+`punch` limiter)
 
 ### `GET /attendance/today`
 
@@ -288,6 +332,10 @@ Everything a home screen needs.
   "timezone": "America/New_York",
   "next_action": "out",
   "can_check": true,
+  "on_break": false,
+  "break_started_at": null,
+  "can_break": true,
+  "next_break_action": "start",
   "is_clocked_in": true,
   "worked_minutes": 2,
   "punches": [ { "id": 109, "type": "in", "status": "late", "scanned_at": "...", "time": "04:57 PM", "office": "Head Office", "source": "mobile" } ],
@@ -303,8 +351,19 @@ Everything a home screen needs.
   02:00 sees the day their shift started, matching how the punch is filed.
 - `can_check` is `false` only while the duplicate cooldown is running. Grey the
   button rather than letting a tap fail.
+- `is_clocked_in` stays `true` **through a break** — the person has not gone
+  home. Do not derive it from the last entry in `punches`: `break_end` is
+  neither `in` nor `out`, and reading it as the end of the day would offer
+  "Check In" to somebody already on the clock and open a second stretch.
+  `next_action`, `is_clocked_in` and `can_break` are the server's answer to
+  exactly that question; use them.
+- `can_break` is `true` only on the clock and outside the cooldown.
+  `next_break_action` (`start` / `end`) labels the break button, and is kept
+  apart from `next_action` because one screen carries both and they move
+  independently.
+- `break_started_at` is set only while `on_break` is `true`.
 - `worked_minutes` counts closed in/out pairs, plus the open stretch up to now
-  when `is_clocked_in` is true.
+  when `is_clocked_in` is true, **less any completed break**.
 - `leave` being set does **not** disable the button. Somebody who books a day
   off and comes in anyway worked, and the record has to say so.
 
