@@ -210,7 +210,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B2.3 | GPS capture at punch | ✅ `geolocator`, permission asked at the first punch; no fix, no permission or no signal sends the punch without coordinates |
 | B2.4 | Offline punch queue → auto-sync when back online | ⬜ |
 | B2.5 | Geofence-aware punch (warn or block outside office) | ⬜ optional |
-| B2.6 | Break in / break out | 🟡 **server side done** — `POST /attendance/break` wraps the same `recordBreak` the web portal's button has called since A4.15, and `/attendance/today` now carries `on_break`, `break_started_at`, `can_break` and `next_break_action`. The Flutter button is what remains. (The row read "needs A4.15 first" long after A4.15 shipped) |
+| B2.6 | Break in / break out | ✅ `POST /attendance/break` wraps the same `recordBreak` the web portal's button has called since A4.15; the Clock screen gains a Start/End break button, shown only on the clock, and the status card reads "On a break" as a third state rather than a fourth word for clocked out. `can_break` defaults to **false** when absent, so a build talking to an older server shows no button instead of one that 404s. Punch rows now label all four types — a ternary on `isIn` rendered `break_start` as "Checked out", the same mistake the server made. (The row read "needs A4.15 first" long after A4.15 shipped) |
 | B2.7 | Mock-location / rooted-device detection | ⬜ |
 | B2.8 | Home-screen widget / quick action for fast punching | ⬜ |
 
@@ -381,10 +381,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 21 | 10 | 14 | 45 |
+| Mobile App (B) | 22 | 9 | 14 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **128** | **21** | **25** | **174** |
+| **Total** | **129** | **20** | **25** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
