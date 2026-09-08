@@ -752,7 +752,71 @@ in. Warn the user before they submit.
 
 ---
 
-## 10. Push devices
+## 10. Documents
+
+The caller's own shelf of the document vault (A3.8) — contracts, ID scans,
+right-to-work papers, certificates. **Read-only.** Filing is HR's job and sits
+behind `manage-employees`; there is no upload, edit or delete here.
+
+Neither route takes an employee id. There is nothing to tamper with and nothing
+to forget in a `where`: the scope is the token's own employee record.
+
+### `GET /documents`
+
+```json
+{
+  "ok": true,
+  "documents": [
+    { "id": 12, "type": "right_to_work", "type_label": "Right to Work / Visa",
+      "title": "Work visa", "original_name": "visa-2026.pdf",
+      "mime_type": "application/pdf", "size_bytes": 184320, "size_label": "180 KB",
+      "issued_on": "2023-04-01", "expires_on": "2026-10-01", "expiry_state": "soon" }
+  ],
+  "expiring_soon": 1,
+  "expired": 0
+}
+```
+
+Ordered **soonest to expire first**, undated last — the list is read to find what
+needs renewing. `expiring_soon` and `expired` are counted server-side so a tab
+badge cannot disagree with the list it opens.
+
+| `expiry_state` | Meaning |
+|---|---|
+| `none` | No expiry date. A contract, usually. |
+| `valid` | Expires, but not within 30 days. |
+| `soon` | Expires within 30 days. HR is being chased about it too. |
+| `expired` | The date has passed. |
+
+`notes` and the uploader are **not** returned. Notes is where HR records why a
+document is being chased; the employee is its subject, not its audience.
+
+### `GET /documents/{id}`
+
+The file itself — **the one endpoint that does not answer with `ok`.** On success
+the body is the document, with `Content-Disposition: attachment` and the name it
+was uploaded under. Failures are JSON as everywhere else, so parse only when the
+status is not 2xx.
+
+Streamed through the API, never a public URL: a guessable link that hands out a
+passport scan without a token is the one mistake in this feature that would
+matter.
+
+**Failures:** `not_found` (404, no such document **or** somebody else's — the two
+are deliberately indistinguishable) · `file_missing` (404, the row outlived its
+file, which means a database was restored without
+`storage/app/employee-documents/`) · `forbidden` (403, no employee record)
+
+### Not here: payslips
+
+B3.7 is written as "payslip / documents". There is no payslip, because there is
+no payroll module — A7.14 exports hours for whatever runs payroll elsewhere. If
+payslips are ever filed into the vault they arrive through this endpoint with no
+change; nothing here needs to know they are special.
+
+---
+
+## 11. Push devices
 
 Registration only. Nothing is delivered yet — notifications are Phase 5. The app
 can register from its first release so it does not need an update when they land.
@@ -789,7 +853,7 @@ the caller, so a token cannot be used to silence somebody else's phone.
 
 ---
 
-## 11. Client checklist
+## 12. Client checklist
 
 1. `GET /ping` before showing login, to distinguish "server down" from "wrong
    password".
