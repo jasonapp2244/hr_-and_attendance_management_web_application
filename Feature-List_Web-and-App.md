@@ -366,6 +366,38 @@ the app is entirely usable in that state.*
 | **Stage 11** | B7 — Manager mode in the app | ✅ Team roster added; approvals and team attendance already shipped |
 | **Stage 12** | A10 — Manager workspace on the web | ✅ The manager promoted from a tab on the employee portal to a first-class role with its own area, dashboard, team screens, scoped reports and approvals inbox. One scope service, no new tables, no mobile change |
 | **Stage 13** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
+| **Stage 14** | The API catches up with the web | ✅ `/attendance/break`, `/documents`, `/attendance/regularisations`, `/directory`. Four features the web had shipped and the API had never exposed — every one of them had a status note naming an internal dependency that had long since been met |
+| **Stage 15** | The app catches up with the API | 🟡 **In progress.** `PushRoute.schedule`, profile editing, the break button, My documents and the Team-tab role gate are done. The regularisation and directory screens remain |
+| **Stage 16** | Roles behave the same on both halves | 🟡 See below. The Team-tab gate is fixed; what an HR sign-in should *do* on a phone is still an open product question |
+| **Stage 17** | Reliability — offline and biometrics | ⬜ B2.4 offline punch queue, B6.3 offline cache, B1.3 biometric unlock. The largest remaining block of app work, and the only part that changes the app's architecture rather than adding to it |
+| **Stage 18** | Store readiness | ⬜ B6.2 multi-language, B6.4 accessibility audit, B6.5 crash reporting, B6.6 force-update gate, B1.1 onboarding, B5.6 notification history. None of it blocks a build; all of it is asked about at review |
+
+### Roles on the phone (Stage 16)
+
+The web separates the four roles properly. The app was written employee-first
+and grew a manager tab, and the seams show in three places.
+
+| | What the app gives them | Right? |
+|---|---|---|
+| **Employee** | Clock, History, Leave, Schedule, Profile, My documents | ✅ |
+| **Manager** | The above plus Team — approvals, team attendance, published roster | ✅ |
+| **HR** | The employee screens. **No HR function at all** | ⚠️ open question |
+| **Admin** | Signs in, then 403s on everything — no employee record | ⚠️ by design, but poorly explained |
+
+**Fixed:** the Team tab hung off the `approve-leave` permission alone. HR holds
+that permission — it is the second step of the approval chain — and almost never
+has direct reports, while every endpoint behind the tab is scoped to direct
+reports. So HR got a Team tab whose every screen was empty, permanently, with
+nothing explaining why; so did any manager with nobody reporting to them. The
+web never had this, because `/manager/*` is gated `role:manager` **as well** and
+refuses HR at the door. The tab now needs the permission **and** `is_manager` —
+a field `/auth/me` had always returned and the app had always parsed and never
+read. "manager is a role *and* a relationship, and both must line up."
+
+**Still open:** whether HR should be able to do anything from a phone. On the
+web HR has a company-wide queue of requests at stage two; in the app they now
+have no approvals screen at all. Either is defensible — HR works at a desk — but
+it should be a decision rather than an accident.
 
 ### The one thing gating the rest
 
