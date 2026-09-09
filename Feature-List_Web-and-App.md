@@ -224,7 +224,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B3.5 | Personal attendance score / on-time streak | 🟡 present/late/leave/absent/worked totals; no score or streak |
 | B3.6 | View assigned shift & upcoming roster | ✅ published roster only |
 | B3.7 | Download own payslip / documents | ✅ `GET /documents` lists the caller's own shelf (expiring first, same four `expiry_state` values as the web badge) and `GET /documents/{id}` streams the file; **My documents** opens from the Profile tab, downloads through the token and hands the file to whatever the phone opens that type with. Saved to the *temporary* directory, not Documents — these are passport scans, and leaving copies where every other app can browse them would undo the point of an authenticated endpoint. `notes` and the uploader are withheld server-side. **No payslip** — there is no payroll module, only the hours export (A7.14) |
-| B3.8 | Company directory (colleagues, departments) | 🟡 **server side done** — `GET /directory`, searchable by name or code and filterable by department and office. Active staff of the caller's own company only. Contact details sit behind a new `directory_show_contact_details` policy, **off by default**: there is one phone column on an employee record, and where staff have no desk line it holds a personal mobile. Everything HR-grade — DOB, address, national ID, personal email, emergency contact, the reporting line — is never returned at any setting. The Flutter screen is what remains |
+| B3.8 | Company directory (colleagues, departments) | ✅ **Colleagues** opens from the Profile tab — searchable, debounced so a five-letter name is one request rather than five. Active staff of the caller's own company only. Contact details sit behind the `directory_show_contact_details` policy, **off by default**: there is one phone column on an employee record, and where staff have no desk line it holds a personal mobile. Call and email buttons are drawn only when the company shares details **and** that person has some — the app reads `shows_contact_details` rather than inferring from a missing phone, so it never draws a button that cannot do anything. Everything HR-grade — DOB, address, national ID, personal email, emergency contact, the reporting line — is never returned at any setting |
 | B3.9 | Raise an attendance correction | ✅ **Corrections** opens from History — next to the record it disputes, since asking for one is rare and makes sense nowhere else. Pick a recent punch to dispute or leave it on "one is missing"; the server tells the two apart from whether `attendance_log_id` is present, so the form never sends a mode that could disagree with itself. Break punches are filtered out of the picker — only `in` and `out` are correctable. The date picker will not go past today, because the server refuses a future correction and offering one would be a trap. Raising and withdrawing only: no decide button for anybody, manager included. Added as a row because Part B only ever tracked the *manager* half (B7.2), which left the employee half invisible |
 
 ## B4. Leave (app)
@@ -367,7 +367,7 @@ the app is entirely usable in that state.*
 | **Stage 12** | A10 — Manager workspace on the web | ✅ The manager promoted from a tab on the employee portal to a first-class role with its own area, dashboard, team screens, scoped reports and approvals inbox. One scope service, no new tables, no mobile change |
 | **Stage 13** | D1 — AI HR Assistant | ⬜ Out of scope for now, by decision. Needs mature data across attendance + leave |
 | **Stage 14** | The API catches up with the web | ✅ `/attendance/break`, `/documents`, `/attendance/regularisations`, `/directory`. Four features the web had shipped and the API had never exposed — every one of them had a status note naming an internal dependency that had long since been met |
-| **Stage 15** | The app catches up with the API | 🟡 **In progress.** `PushRoute.schedule`, profile editing, the break button, My documents and the Team-tab role gate are done. The regularisation and directory screens remain |
+| **Stage 15** | The app catches up with the API | ✅ `PushRoute.schedule`, profile editing, the break button, My documents, Corrections and Colleagues. Every endpoint the API offers now has a screen behind it |
 | **Stage 16** | Roles behave the same on both halves | ✅ The Team-tab gate now needs the permission *and* a team, so HR and report-less managers no longer get an empty area. HR is desk-only by decision — see below |
 | **Stage 17** | Reliability — offline and biometrics | ⬜ B2.4 offline punch queue, B6.3 offline cache, B1.3 biometric unlock. The largest remaining block of app work, and the only part that changes the app's architecture rather than adding to it |
 | **Stage 18** | Store readiness | ⬜ B6.2 multi-language, B6.4 accessibility audit, B6.5 crash reporting, B6.6 force-update gate, B1.1 onboarding, B5.6 notification history. None of it blocks a build; all of it is asked about at review |
@@ -420,10 +420,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 24 | 7 | 14 | 45 |
+| Mobile App (B) | 25 | 7 | 13 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **131** | **18** | **25** | **174** |
+| **Total** | **132** | **18** | **24** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
