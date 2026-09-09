@@ -208,7 +208,7 @@ absence against working days only. Weekends and company holidays count as neithe
 | B2.1 | Big one-tap Check In / Check Out button | ✅ double-tap reads as success, not as an error |
 | B2.2 | Live status card (checked in at 09:02, hours so far) | ✅ ticks locally between refreshes |
 | B2.3 | GPS capture at punch | ✅ `geolocator`, permission asked at the first punch; no fix, no permission or no signal sends the punch without coordinates |
-| B2.4 | Offline punch queue → auto-sync when back online | ⬜ |
+| B2.4 | Offline punch queue → auto-sync when back online | ✅ A failed punch is kept on the handset at **the moment it was tapped** and delivered by `POST /attendance/sync` when there is something to deliver it over. **This is the one place the device clock is trusted**, by decision: stamping a queued punch on arrival would file a 09:00 check-in as 17:00 and hand payroll a wrong number. It is bounded — future times and anything over 48h are refused rather than clamped — and labelled `source: mobile_offline` with the delivery delay in `notes`. No connectivity library: those answer "is there an interface", which is not the question on hotel wifi behind a captive portal, so a punch is always attempted first and queued only when the attempt actually fails. Held in a JSON file, so it survives a force-quit; cleared on sign-out, since undelivered punches belong to whoever made them |
 | B2.5 | Geofence-aware punch (warn or block outside office) | ⬜ optional |
 | B2.6 | Break in / break out | ✅ `POST /attendance/break` wraps the same `recordBreak` the web portal's button has called since A4.15; the Clock screen gains a Start/End break button, shown only on the clock, and the status card reads "On a break" as a third state rather than a fourth word for clocked out. `can_break` defaults to **false** when absent, so a build talking to an older server shows no button instead of one that 404s. Punch rows now label all four types — a ternary on `isIn` rendered `break_start` as "Checked out", the same mistake the server made. (The row read "needs A4.15 first" long after A4.15 shipped) |
 | B2.7 | Mock-location / rooted-device detection | ⬜ |
@@ -316,7 +316,7 @@ the app is entirely usable in that state.*
 |---|---|---|
 | C1.1 | **Laravel Sanctum token auth + `routes/api.php`** | ✅ |
 | C1.2 | `/auth/login`, `/auth/logout`, `/auth/me` (+ `logout-all`, `devices`) | ✅ |
-| C1.3 | `/attendance/check`, `/attendance/break`, `/attendance/history`, `/attendance/today`, `/attendance/regularisations` | ✅ same AttendanceService as the web button — one set of punch rules. `today` reads clocked-in state from `breakState`, not from the last punch: `break_end` is neither `in` nor `out`, so the old reading would have offered "Check In" to somebody who never left |
+| C1.3 | `/attendance/check`, `/attendance/break`, `/attendance/sync`, `/attendance/history`, `/attendance/today`, `/attendance/regularisations` | ✅ same AttendanceService as the web button — one set of punch rules. `today` reads clocked-in state from `breakState`, not from the last punch: `break_end` is neither `in` nor `out`, so the old reading would have offered "Check In" to somebody who never left |
 | C1.4 | `/leave/*` endpoints | ✅ balances, apply, list, withdraw + the manager inbox — all via LeaveService |
 | C1.5 | `/schedule`, `/profile`, `/documents` endpoints | ✅ published roster only, leave/holiday/weekend aware; profile read + contact edit + password; own documents listed and streamed, read-only |
 | C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
@@ -369,7 +369,7 @@ the app is entirely usable in that state.*
 | **Stage 14** | The API catches up with the web | ✅ `/attendance/break`, `/documents`, `/attendance/regularisations`, `/directory`. Four features the web had shipped and the API had never exposed — every one of them had a status note naming an internal dependency that had long since been met |
 | **Stage 15** | The app catches up with the API | ✅ `PushRoute.schedule`, profile editing, the break button, My documents, Corrections and Colleagues. Every endpoint the API offers now has a screen behind it |
 | **Stage 16** | Roles behave the same on both halves | ✅ The Team-tab gate now needs the permission *and* a team, so HR and report-less managers no longer get an empty area. HR is desk-only by decision — see below |
-| **Stage 17** | Reliability — offline and biometrics | ⬜ B2.4 offline punch queue, B6.3 offline cache, B1.3 biometric unlock. The largest remaining block of app work, and the only part that changes the app's architecture rather than adding to it |
+| **Stage 17** | Reliability — offline and biometrics | 🟡 **B2.4 offline punch queue done**, both halves. B6.3 offline cache and B1.3 biometric unlock remain |
 | **Stage 18** | Store readiness | ⬜ B6.2 multi-language, B6.4 accessibility audit, B6.5 crash reporting, B6.6 force-update gate, B1.1 onboarding, B5.6 notification history. None of it blocks a build; all of it is asked about at review |
 
 ### Roles on the phone (Stage 16)
@@ -420,10 +420,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 25 | 7 | 13 | 45 |
+| Mobile App (B) | 26 | 7 | 12 | 45 |
 | Backend / API (C) | 15 | 2 | 0 | 17 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **132** | **18** | **24** | **174** |
+| **Total** | **133** | **18** | **23** | **174** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
