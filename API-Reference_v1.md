@@ -98,7 +98,7 @@ IP, so limiting on that would have one busy person throttle their colleagues.
 |---|---|---|
 | `api` | every endpoint | 120 / minute |
 | `login` | `POST /auth/login` | 5 / minute, per address **and** IP |
-| `punch` | `POST /attendance/check`, `POST /attendance/break` | 20 / minute |
+| `punch` | `POST /attendance/check`, `POST /attendance/break`, `POST /attendance/sync` | 20 / minute |
 | `write` | every endpoint that creates or changes a record | 30 / minute |
 
 The stricter limiters stack on top of the ceiling. Every response carries
@@ -281,6 +281,64 @@ on (A4.16, off by default). Its `message` names the distance, so show it rather
 than a generic failure — "move closer" is the one thing the person can act on.
 A punch that arrives with no coordinates is never fenced, so refusing location
 permission does not lock anybody out.
+
+### `POST /attendance/sync`
+
+Deliver punches made with **no signal** (B2.4). A batch, because the moment this
+runs is the moment the connection is worst — four punches over a dropping link
+is four chances to fail rather than one.
+
+| Field | Type | Notes |
+|---|---|---|
+| `punches` | array, required, 1–50 | Oldest first is not required; the server sorts. |
+| `punches[].occurred_at` | date-time, required | **When the person actually tapped**, from the device clock. |
+| `punches[].latitude` | numeric, optional | |
+| `punches[].longitude` | numeric, optional | |
+
+**This is the one endpoint where the device clock is trusted**, and only within
+bounds. The alternative is worse: stamping a queued punch on arrival files a
+09:00 check-in as 17:00 and hands payroll a number that is simply wrong. So the
+claimed time is taken, capped, and labelled — the row's `source` is
+`mobile_offline`, and its `notes` record how long it sat on the handset.
+
+- **Future times are refused**, not clamped.
+- **Anything older than 48 hours is refused**, not clamped — a clamped time is a
+  wrong time that looks right. Past that, raise a regularisation instead
+  (`POST /attendance/regularisations`), which carries a reason and a decision.
+- The **type is still the server's**, inferred from the punches *before* that
+  moment rather than the last of the day, so a queued punch slots into the
+  sequence instead of being appended to it.
+
+```json
+{
+  "ok": true,
+  "results": [
+    { "occurred_at": "2026-08-03 09:00:00", "result": "accepted",
+      "punch": { "id": 140, "type": "in", "status": "late", "scanned_at": "…",
+                 "time": "09:40 AM", "office": "Head Office", "source": "mobile_offline" } },
+    { "occurred_at": "2026-08-03 23:00:00", "result": "refused",
+      "message": "That punch is dated in the future. Check the date and time on this device." }
+  ],
+  "accepted": 1, "duplicate": 0, "refused": 1
+}
+```
+
+**Partial success is the normal case, so read `results` per punch, not the
+counts.** One refused entry must not discard three good ones.
+
+| `result` | What the app does |
+|---|---|
+| `accepted` | Drop it from the queue. |
+| `duplicate` | Drop it from the queue — it already landed on an earlier attempt. |
+| `refused` | Drop it from the queue and tell the person `message`. Retrying will not change the answer. |
+
+Re-sending a punch already delivered returns `duplicate` rather than writing a
+second row. A queue retries whenever a connection is flaky — precisely when this
+endpoint is in use — and attendance is append-only, so a duplicate could only
+ever be voided, never removed.
+
+**Failures:** `no_office` (422) · `forbidden` (403) · `validation_failed` (422,
+empty or over 50) · `too_many_requests` (429, the `punch` limiter)
 
 ### `POST /attendance/break`
 
