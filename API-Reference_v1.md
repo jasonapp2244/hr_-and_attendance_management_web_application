@@ -21,6 +21,42 @@ The version is in the path, not a header. An app already installed on someone's
 phone cannot be forced to upgrade, so `v2` has to be able to run alongside `v1`
 rather than replacing it under the same URLs.
 
+### Language
+
+Send `Accept-Language: en` or `Accept-Language: es`. Every `message`, every
+`errors` entry, every `stage`, and the meridiem on a pre-formatted `time` come
+back in that language (B6.2 in the app, C1.18 on the server).
+
+**The `error` code never changes.** It is the field to branch on; `message` is
+the field to show. That split is what let the server start answering in Spanish
+without a single change on a handset already in somebody's pocket.
+
+**The header can never make a request fail.** A language this build does not
+have, a malformed header, a `q=0`, no header at all — all of them answer in
+English rather than refusing. It is a preference, not a credential, and a 422
+for an unreadable `Accept-Language` would be a client that cannot talk to the
+server over a header it may not have set deliberately. Region is dropped:
+`es-MX` and `es-419` are both `es`.
+
+**The header is also remembered against the account.** Notifications are
+rendered when a worker picks them up — no request, no header — and usually
+because of somebody else's action: HR approving leave in English decides what an
+employee reads in Spanish. So each authenticated call records the language on
+the user, and everything sent to that person later is written in it.
+
+Three things stay in the language they were typed in, because they are data
+rather than vocabulary:
+
+| | Why |
+|---|---|
+| `leave_type` | A row in `leave_types`, named per company. Rename it to translate it. |
+| Office, department and designation names | Same. |
+| The maintenance message on `GET /app/status` | Typed by an administrator for a specific outage. |
+
+The **web dashboard is English only**, by decision — it is HR's and the
+administrator's screen. Every message the two halves share resolves under the
+default locale there, so a web response is unchanged.
+
 ### Response shape
 
 Every response carries `ok`, so a client branches on one field rather than
@@ -100,6 +136,7 @@ IP, so limiting on that would have one busy person throttle their colleagues.
 | `login` | `POST /auth/login` | 5 / minute, per address **and** IP |
 | `punch` | `POST /attendance/check`, `POST /attendance/break`, `POST /attendance/sync` | 20 / minute |
 | `write` | every endpoint that creates or changes a record | 30 / minute |
+| `crash` | `POST /app/crashes` | 6 / minute, per IP — it is a public write |
 
 The stricter limiters stack on top of the ceiling. Every response carries
 `X-RateLimit-Limit` and `X-RateLimit-Remaining`; a `429` adds `Retry-After`.
@@ -116,6 +153,93 @@ before showing a login screen.
 ```json
 { "ok": true, "service": "Employment Management Portal", "version": "v1", "time": "2026-07-30T19:13:39+00:00" }
 ```
+
+### `GET /app/status`
+
+No token required, and the only endpoint that keeps answering during a
+maintenance window — a gate reachable only with a token cannot explain why
+signing in is failing. Call it at launch and again when the app returns to the
+foreground.
+
+| Query | Type | Notes |
+|---|---|---|
+| `version` | string | The running build, `major.minor.patch` (a `+build` suffix is ignored). Optional. |
+| `platform` | string | `android` or `ios`. Optional — without it no store link can be returned, so no update is required. |
+
+```json
+{
+  "ok": true,
+  "action": "ok",
+  "message": null,
+  "minimum_version": "1.2.0",
+  "latest_version": "1.4.0",
+  "store_url": null
+}
+```
+
+`action` is one of:
+
+| Value | What the app must do |
+|---|---|
+| `ok` | Carry on. |
+| `update_required` | Stop at an update screen and open `store_url`. `message` says why. |
+| `maintenance` | Stop at a "back shortly" screen showing `message`, and offer a retry. |
+
+**The server decides; the app obeys.** The comparison is made here rather than
+in the app because the app is the half that cannot be fixed — a handset with a
+broken comparator has already shipped, and the answer it is given is the only
+thing left that can change its behaviour.
+
+**It fails open.** A missing or unreadable `version`, an unrecognised
+`platform`, or no store link configured for that platform all answer `ok`. So
+does any failure to reach this endpoint at all: the app must treat a network
+error as "carry on", or a flat server would take every handset in the company
+offline along with it — including the offline punch queue, whose whole purpose
+is to work when the server cannot be reached.
+
+`latest_version` is advisory. Nothing is blocked by it and the app does not read
+it today; it is returned so support can see what a handset should be running.
+
+`minimum_version` and `latest_version` are null while unset, which is the
+default — an empty floor means no build is ever refused.
+
+### `POST /app/crashes`
+
+No token required, and a token is used if one happens to be sent. Crashes are
+written to the handset at the moment they happen and delivered on its **next
+launch**, so this is a batch of things that already happened, not a live feed.
+
+Unauthenticated on purpose, and for a stronger reason than the gate above: the
+crash worth having is the one that stops the app opening, and an endpoint behind
+`auth:sanctum` would collect every crash except that one. Send the bearer token
+when there is one and the report is attributed to that person and company;
+without it the report is kept with neither.
+
+| Field | Type | Notes |
+|---|---|---|
+| `reports` | array | 1–5 per call. The app never queues more than 5. |
+| `reports[].exception` | string | Required. The exception class. Max 191. |
+| `reports[].message` | string | Max 500, **truncated by the sender**. Never build one out of personal data — it lands in a table an administrator reads. |
+| `reports[].stack` | string | Max 8000. |
+| `reports[].platform` | string | `android` or `ios`. |
+| `reports[].app_version` | string | The build that crashed, not the one reporting. |
+| `reports[].os_version` | string | `Platform.operatingSystemVersion` — on Android this already names the handset build, which is why no separate device field is collected. Max 191. |
+| `reports[].occurred_at` | ISO-8601 | When it crashed. **The device clock is trusted here**, as it is for an offline punch — a report delivered three days later is worth nothing stamped with its arrival. Bounded: a future time, or anything over 30 days old, is replaced with the arrival time. |
+
+```json
+{ "ok": true, "stored": 2 }
+```
+
+Answers `201`. Throttled on its own limiter (6/min per IP) because it is a
+public write: a handset delivers what it queued once per launch, and an app
+crashing hard enough to relaunch six times a minute has already said everything
+the seventh report would.
+
+The server groups reports by a fingerprint of the exception plus the top few
+stack frames, so a hundred handsets hitting one bug read as one row. Nothing is
+sent to any third party — there is no crash service and no analytics SDK in this
+app, and the reports are readable only by an administrator, under
+**Administration → App Crash Reports**.
 
 ---
 
@@ -888,6 +1012,76 @@ in. Warn the user before they submit.
 ```
 
 **Failures:** `wrong_password` (422) · `validation_failed` (422)
+
+---
+
+## 9b. Notifications
+
+The history behind the pushes (B5.6). Everything in the `notifications` table
+that was addressed to the caller, newest first — so a notification that arrived
+while the phone was in a locker can still be read after the OS banner is gone.
+
+**Not scoped to an employee record**, unlike almost everything else here. A
+notification is addressed to a *user*: an HR account with no employee row still
+receives document-expiry warnings, and hiding them would be a bug rather than a
+boundary. Laravel's relation does the scoping, so there is nothing here anybody
+can reach that was not sent to them.
+
+### `GET /notifications`
+
+25 per page.
+
+```json
+{
+  "ok": true,
+  "notifications": [
+    {
+      "id": "9b1f...-...",
+      "type": "leave.approved",
+      "title": "Your leave was approved",
+      "body": "Your Annual Leave for 12 to 14 Sep 2026 has been approved.",
+      "route": "leave",
+      "read_at": null,
+      "created_at": "2026-09-09T14:02:11+00:00"
+    }
+  ],
+  "unread": 3,
+  "meta": { "current_page": 1, "last_page": 2, "per_page": 25, "total": 34 }
+}
+```
+
+`unread` counts **everything** unread, not what is on the page — it is what the
+badge shows.
+
+`route` is the same vocabulary as a push payload's: `clock`, `leave`,
+`schedule`, `approvals`, or **null**. Null is an ordinary answer — a
+document-expiry warning is addressed to HR, who work at a desk, and the app has
+no screen to point at. Both this and the push route come from one mapping on the
+server (`App\Support\AppRoute`), because they used to be written out separately
+and drifted: `schedule` was sent for months before the app had an enum row for
+it, and every roster notification landed nowhere in particular.
+
+Only the four keys every notification class agrees on are published — `type`,
+`title`, `body` and the derived route. The stored payload also carries a **web**
+`url` and per-class extras; neither is returned, so a new notification type
+needs no client change to appear here.
+
+### `POST /notifications/{id}/read`
+
+Marks one read. Answers `{ "ok": true, "unread": 2 }`.
+
+**An id that is not there is not an error.** The app may be delivering a tap
+made offline, by which time the row can be gone — "it is not unread any more"
+is true either way, and a 404 would leave the screen showing a badge it cannot
+clear.
+
+Unlike the web screen, reading and navigating are separate here: on a phone the
+list *is* the destination for most of these, because the body is the whole
+message.
+
+### `POST /notifications/read-all`
+
+Marks every unread one read. Answers `{ "ok": true, "unread": 0 }`.
 
 ---
 

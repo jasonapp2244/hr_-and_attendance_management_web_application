@@ -320,8 +320,9 @@ One line, every minute; Laravel decides internally what is due. Without it:
 | `attendance:remind-checkout` | 15 min | Nobody is reminded they are still clocked in |
 | `attendance:close-day` | hourly | Open punches are never closed; recorded hours stay wrong |
 | `db:backup --verify` | 02:10 daily | There are no backups at all |
+| `crashes:prune` | 03:20 daily | `crash_reports` grows for ever — the one table an unauthenticated caller can add to |
 
-None of the three announces its absence. `emp:preflight` infers the scheduler's
+None of them announces its absence. `emp:preflight` infers the scheduler's
 health from whether a backup actually appeared, which is the only end-to-end
 evidence available.
 
@@ -357,9 +358,19 @@ sudo -u www-data php artisan emp:preflight
 settings, proxy trust, database and pending migrations, writable paths, mail,
 whether anything is draining the queue, whether the scheduler has produced a
 recent backup, the backup path and binaries, push coherence, company timezones,
-and whether any admin or HR account still uses the seeded password `password`.
+the mobile app gate, and whether any admin or HR account still uses the seeded
+password `password`.
 
 It exits non-zero on a failure, which is why `deploy.sh` runs it last.
+
+**The app gate is the check most likely to fail on a second deploy.**
+`MOBILE_MAINTENANCE=true` shows every handset a "back shortly" screen while the
+API carries on answering, which is what makes it useful during a migration and
+what makes it easy to forget afterwards — nothing on the server complains, and
+the only symptom is that nobody can clock in from their phone. Preflight treats
+it as a failure for that reason. `MOBILE_MIN_VERSION` is the other half: leave
+it empty unless you mean it, and never set it without both store links, which
+preflight also refuses.
 
 Then by hand:
 
@@ -408,7 +419,8 @@ Both are worked around by `deploy/emp-webspace.cron`, which replaces **both**
 
 The 5-minute floor costs nothing. Every task in `routes/console.php` already
 falls on a 5-minute boundary — `everyFifteenMinutes()` at :00/:15/:30/:45,
-`hourly()` at :00, and the four dailies at 01:30, 02:10, 06:45 and 10:30 — so a
+`hourly()` at :00, and the five dailies at 01:30, 02:10, 03:20, 06:45 and
+10:30 — so a
 `*/5` cron fires `schedule:run` at every moment one of them is due. Nothing in
 the schedule was changed to fit this host, and nothing should be: moving a task
 off a 5-minute boundary would silently stop it running here while continuing to

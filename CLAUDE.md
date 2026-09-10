@@ -15,8 +15,16 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1066 tests, ~110s, SQLite in memory
+php artisan test             # 1157 tests, ~160s, SQLite in memory
+
+cd ../mobile
+flutter analyze
+flutter test                 # 193 tests
 ```
+
+The app's strings are generated from `mobile/lib/l10n/*.arb` on `flutter pub
+get` and on every build, into a git-ignored `lib/l10n/generated/`. Nothing extra
+to run after a clone; `flutter gen-l10n` regenerates them by hand.
 
 `config('app.timezone')` is **deliberately UTC** and must stay that way. Per-company
 time comes from `Company::tz()`. "Fixing" it to a local zone would shift what
@@ -132,8 +140,414 @@ $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));   // then move on
 
 ---
 
+### 8. Real file I/O inside `testWidgets` hangs, it does not fail
+
+`testWidgets` runs in a fake-async zone. It advances timers when you `pump`, and
+it **never delivers a real file completion at all** — so a widget whose build or
+`initState` reaches `OfflineCache`, `PunchQueue` or any other `dart:io` call
+sits there for ever. No assertion fires, no timeout fires, the whole
+`flutter test` run just stops with the test name on screen and nothing after it.
+That looks exactly like an infinite `pumpAndSettle`, which is what you will
+waste the time looking for.
+
+Prime the stores first, inside `tester.runAsync`, and pump a screen that only
+reads memory:
+
+```dart
+await tester.runAsync(() async {
+  final store = OfflineCache(directory: dir);
+  await store.write(OfflineCache.keyProfile, {'user': ...});  // loads the file
+  final queue = PunchQueue(directory: dir);
+  await queue.load();
+  session = Session(api: ..., cache: store, queue: queue);
+  await session.restore();
+});
+
+await tester.pumpWidget(app(session));   // memory only from here
+```
+
+Both stores read their file once and hold it, so this is also what a real
+handset does after the first launch.
+
+### 9. The biometric lock can lock its own owner out
+
+`AppLock.enable()` runs the check **before** it writes the preference, and that
+order is the whole feature. A switch that saves first and asks afterwards puts
+the app behind a sensor that has just refused somebody, on a phone they cannot
+sign out of either — the way back is a reinstall, which also discards every
+punch still queued for a signal.
+
+Three more rules go with it, and each is there because the phone is not a
+reliable partner:
+
+- **The lock screen always offers *Sign out instead*.** Fingerprints get
+  removed, face data gets reset, a sensor breaks. `BiometricOutcome.unavailable`
+  is the one outcome that must never be retried into a dead end.
+- **The switch is drawn only where `isAvailable()` is true**, which means a
+  biometric actually *enrolled* — not merely "the device supports
+  authentication". With a PIN and no fingerprint, `authenticate()` still
+  succeeds by prompting for that PIN, so the row would offer fingerprint unlock
+  on a phone that has none and then ask for something else.
+- **`backgroundGrace` must stay well above zero.** The OS backgrounds the app
+  for its own dialogs — the location prompt at the first punch, a document
+  opening elsewhere, *and the biometric sheet itself*. Locking on every resume
+  puts the lock behind the sheet it just opened. `_prompting` guards the sheet;
+  the minute covers the rest.
+
+The preference lives in the keystore beside the token and is cleared with it:
+it says "this phone is shared", which is a statement about the person who set
+it, not about the handset.
+
+**Android needs three native changes, and two of them fail only at runtime.**
+`MainActivity` extends `FlutterFragmentActivity` — androidx.biometric's prompt
+is a Fragment and there is no FragmentManager under a plain `FlutterActivity`,
+so the first press of Unlock throws. `LaunchTheme` and `NormalTheme` descend
+from `Theme.AppCompat` for the same reason, and without it the prompt crashes on
+Android 8 and below only. `USE_BIOMETRIC` is declared; there is deliberately no
+`<uses-feature>`, which would hide the app in the Play Store from every device
+without a sensor. On iOS, `NSFaceIDUsageDescription` is the same trap as the
+location key — iOS kills the app rather than refusing, and only on a Face ID
+handset.
+
+**A Kotlin plugin builds noisily from a different drive.** With the pub cache on
+`C:` and the project on `F:`, `local_auth_android`'s incremental compile logs a
+stack of `IllegalArgumentException: this and base files have different roots`.
+The build succeeds — `flutter build apk` finishes and the APK is written. It is
+the first plugin in this app with Kotlin sources, so this noise is new, and it
+is not a failure.
+
+### 10. The app gate is the one switch that can stop everybody
+
+`GET /app/status` decides whether a build may carry on (B6.6), and it is driven
+by two values typed into an env file. Get either wrong and every handset in the
+company stops at a screen — and the people it stops are the ones who clock in
+with it. Nothing on the server side goes wrong when that happens, so there is
+no alarm to notice.
+
+Everything about it is therefore built to **fail open**, at every level:
+
+- `AppVersion::compare()` returns **null**, not `-1`, for anything it cannot
+  read. A caller treating that as "older" would refuse a whole fleet over a
+  typo. `isOlderThan()` is the only thing that turns it into a bool, and it
+  answers false whenever it does not know.
+- The endpoint does **not** validate its query. A 422 is the one shape the app
+  cannot act on — it asks this before it knows anything, so a refusal leaves it
+  with no verdict at all. Junk in either parameter falls through to `ok`.
+- A minimum version with no store link for that platform answers `ok`. An
+  update screen with a dead button cannot be dismissed *or* acted on.
+- `AppGate` in the app treats an unreachable server, an unparseable body and an
+  action invented after the build shipped as `ok`. **This one matters most**:
+  the app is deliberately usable with no signal, and a gate that blocked on a
+  failed request would take the offline cache and the punch queue away in
+  exactly the conditions they exist for.
+
+**The comparison lives on the server, not in the app.** The app is the half
+that cannot be fixed — a handset with a broken comparator has already shipped,
+and the answer it is given is the only thing left that can change what it does.
+
+**Maintenance is a flag of its own, not `php artisan down`.** `down` returns
+503 to everything, which the app cannot tell apart from an outage: it would
+fall back to its cache and let somebody queue punches into a server being
+migrated underneath them. Both settings live in `config/mobile.php` rather than
+in the database, because the moment they matter most is the moment the database
+is unavailable. `emp:preflight` fails a deploy that leaves maintenance on.
+
+### 11. The store declarations drift silently, and only Apple notices
+
+Four documents describe what the app collects and a reviewer compares them: the
+data-safety table in `Store-Submission_Checklist.md`, `/privacy` on the server,
+`mobile/ios/Runner/PrivacyInfo.xcprivacy`, and the forms on both consoles.
+
+**Two of them said the app does not collect location for some time after B2.3
+shipped** — the checklist row read "not collected" and the Apple manifest had no
+location entry at all, both with comments promising to be updated "when B2.3
+ships". Nothing failed. An app that collects location without declaring it is
+the most common cause of an enforcement removal, and the removal arrives after
+review, not at upload.
+
+Re-read all four against the code before any submission. The same trap is now
+armed for push: an FCM token is a device identifier, and the day
+`google-services.json` lands in a build, the data forms change with it.
+
+### 12. A guard claimed after an `await` is not a guard
+
+`PunchQueue.flush()` shipped with this, and `CrashReporter.flush()` was written
+with it before it was caught:
+
+```dart
+await load();
+if (_pending.isEmpty || _flushing) return;   // wrong
+_flushing = true;
+```
+
+`await load()` yields to the microtask queue **even when `load()` has nothing to
+read and returns immediately** — an `async` function's caller always suspends.
+So two callers arriving together both get past the check, both set the flag, and
+both send the same batch. The pair that does it in practice is a resume and a
+manual retry landing in the same turn, which is exactly the case the guard was
+written for.
+
+Nothing looked broken: the server recognises the second delivery of a punch as
+duplicates, so no attendance was written twice. The cost was on the app side —
+a `SyncOutcome` reporting punches as *duplicate* that had in fact just been
+accepted by its own first call.
+
+**Claim the flag before the first `await`, and release it in a `finally`.**
+
+### 13. Crash reports go to this server, and nowhere else
+
+B6.5 is a table on the employer's own server, not Crashlytics, not Sentry. That
+is a decision, not an oversight: a stack trace routinely carries fragments of
+whatever the app was holding, and four documents — `/privacy`, the Apple
+privacy manifest, and both store data forms — say the app shares nothing with
+any third party and contacts exactly one host. A crash SDK falsifies all four at
+once. If one is ever added, they all change with it, and so does the answer to
+the tracking question.
+
+The rest of the design follows from what a crash reporter has to survive:
+
+- **Written to disk at the moment of the crash, delivered on the next launch.**
+  A reporter that posts from inside a dying process loses the crash that killed
+  it, which is the only kind worth having.
+- **`POST /app/crashes` is unauthenticated.** The crash worth having most is the
+  one that stops the app opening; an endpoint behind `auth:sanctum` would
+  collect every crash except that one. The controller reads a token if one is
+  present, so a report from a signed-in handset is attributed anyway. Being a
+  public write, it has its own tight limiter and a hard cap on every field.
+- **Nothing in `CrashReporter` may throw.** An error handler that fails turns
+  one crash into a loop, so every path swallows its own failures.
+- A report the server *refuses* is dropped rather than kept — holding it would
+  retry one rejection at every launch for ever. A report that never *arrived* is
+  kept. `ApiException.isNetworkFailure` is the difference, the same distinction
+  the offline cache turns on.
+
+### 14. A status colour cannot be one value
+
+`AppTheme.present` and its four siblings used to be `static const Color`, chosen
+against a white card and then drawn unchanged on a #161C22 one. Three of the
+five came out between 2.8:1 and 3.4:1 in dark mode — under AA for the 11–13px
+text they are almost always used for, and under *everything* on the raised
+surfaces.
+
+There is no fixing that by picking a better value. Body text on white needs a
+relative luminance at or below about 0.17; body text on #1E262E needs one at or
+above about 0.26. Nothing is both. So the colours live on **`AppColors`**, which
+resolves by brightness:
+
+```dart
+final colors = AppColors.of(context);   // in build(), or before the first await
+```
+
+Every value clears **4.5:1 on the worst surface it meets, including its own
+10–15% tint** — the house pattern for a banner or a chip puts the colour on a
+wash of itself, which is the tightest pairing in the app and the one most easily
+got wrong. `test/accessibility_test.dart` measures all of that; it does not
+consult this comment.
+
+**`AppTheme.brand` is identity, not text.** #F26522 is 3.15:1 on white: enough
+for the 21px Check-in label (large text, 3:1), the splash mark and the focus
+ring, and nowhere near enough for a caption or a 16px button label. It was
+`primary` with white on it, which failed on every ordinary button in the app;
+`primary` is `brandDeep` now in light mode and near-black-on-orange in dark.
+Putting the bright orange back on `primary` fails a test.
+
+### 15. Fixed heights clip at the OS's larger font sizes
+
+Nothing in the app clamps `textScaler`, which is right — an employee who has
+turned the system font up has done so deliberately. The cost is that a
+`SizedBox(height: …)` wrapped round text is a clipping bug waiting for the first
+person who uses that setting, and it had claimed the punch button, the break
+button and two rows on the clock screen.
+
+Use `ConstrainedBox(minHeight:)` and a matching `minimumSize` on the button
+style — the theme's own `Size.fromHeight` will otherwise pull it back down — and
+give a `Row` carrying text an `Expanded`, or make it a `Wrap`.
+
+`test/accessibility_test.dart` pumps five screens at 2× in both themes. Flutter
+raises an overflow as a rendering exception, which `testWidgets` fails on, so
+that is a real check and not a screenshot somebody has to look at.
+
+### 16. One list per side for the notification route
+
+`route` decides which tab a notification opens, and it used to be written out
+by hand in every `toPush()` on the server and listed again in `PushRoute` on
+the app. The two drifted: `schedule` was sent for months to a build whose enum
+had never heard of it, and because an unknown route opens the app normally
+rather than crashing, nothing ever said so.
+
+There is now one list on each side. On the server, **`App\Support\AppRoute`**
+maps a notification's `type` to its route, and both the push payload and the
+notification history (B5.6) read it. In the app, `PushRoute.parse` handles
+both a pushed route and a listed one, so `AppNotification` cannot invent a
+second answer.
+
+It is keyed on `type` rather than on anything only a push carries, because
+`toDatabase()` has never recorded a route — so every row already in the
+`notifications` table has to get its answer from the type alone.
+
+**Null is an ordinary answer.** `document_expiring` and `late_arrivals` are
+addressed to HR, who work at a desk; the app has no screen for either, and a
+notification with nowhere to go simply offers no button.
+
+### 17. Not everything in the keystore belongs to the account
+
+Four things on the handset are cleared when the token is: the punch queue, the
+offline cache, the biometric preference and the unread badge. Each belongs to
+the person who was signed in, and the next one on a shared phone must not
+inherit it.
+
+**The onboarding flag is the exception** (B1.1). It describes the *handset* —
+whether this phone has ever been introduced to the app — and signing out at the
+end of a shift is not a request to be walked through the carousel again in the
+morning. `Session._clearToken` deliberately does not touch
+`hrms_onboarding_seen`, and there is a test that says so.
+
+**The language is the second exception, and for the same shape of reason**
+(B6.2). `hrms_locale` describes the handset, and clearing it at sign-out would
+put the *login form* back into a language the person standing there cannot read
+— on the one screen they cannot get past in order to change it. `_clearToken`
+deliberately does not touch it either, and `test/locale_test.dart` says so.
+
+Two more rules go with it. `needsOnboarding` is read **once, inside
+`restore()`**, because `_Root` builds synchronously and an answer arriving a
+frame later has already flashed the login form at the person it was meant to
+introduce. And it is never true for a session that restored: somebody signed in
+on this handset has used it before, whatever the keystore says.
+
+
+### 18. A translated label cannot also be an identifier
+
+The app is drawn in English or Spanish (B6.2), and two things in it were
+matching on **the word under an icon** rather than on a key.
+
+`HomeShell` keyed its per-tab visibility map on the tab's label, and `PushRoute`
+carried a `tabLabel` that a tapped notification was matched against. Translate
+the labels and both stop finding anything — a notification tap would have opened
+the app on whatever tab it happened to be on, on every Spanish handset, and
+nothing would have thrown. `_Tab` has an `id` now, `PushRoute` has `tabId`, and
+one function — `tabLabel(t, id)` in `home_shell.dart` — turns an id into the
+word, so the shell and the notification row cannot disagree about what a tab is
+called.
+
+The rule generalises: **anything that has to *find* something matches on a key,
+and only the last step turns a key into words.** The same shape applies to
+`AppColors.statusStyle` and `punchTypeLabel`, both of which take a server key
+and hand back a translated label.
+
+### 19. `context.t` in `initState` is an assertion, not a warning
+
+`AppLocalizations.of` is `dependOnInheritedWidgetOfExactType`, and Flutter
+refuses that before the element has finished its first build. Every data screen
+here calls `_load()` from `initState`, so a `final t = context.t;` at the top of
+`_load` — the obvious place, because the `catch` is what needs it — takes the
+screen down with *"dependOnInheritedWidgetOfExactType() was called before
+initState() completed"*.
+
+Nothing fails at compile time and `flutter analyze` says nothing. It shows up as
+a widget test that finds none of the text it was looking for.
+
+**Read the strings inside the `catch`, after the `mounted` check.** That is
+already the house pattern for a `BuildContext` on the far side of an `await`,
+and the strings are only ever needed there:
+
+```dart
+} on ApiException catch (e) {
+  if (!mounted) return;
+  final t = context.t;          // here, never above the `try`
+```
+
+A handler invoked by a button is fine — the constraint is `initState` alone.
+
+### 20. Spanish does not build a date the way English does
+
+"4 August 2026" is "4 **de** agosto **de** 2026". A date assembled in Dart as
+`'$day $month $year'` cannot express that, so `dateShort` and `dateLong` are
+**messages with placeholders** and the ordering belongs to whoever writes the
+translation. The same goes for anything that reads as a sentence:
+`Regularisation.summary` is four separate messages rather than "disputing a "
+plus a punch name, because lower-casing an assembled English sentence is not a
+translation strategy.
+
+**The month names live in the ARB files, not in `intl`'s `DateFormat`.** That is
+deliberate. `DateFormat('d MMM', 'es')` needs `initializeDateFormatting` to have
+been called first and throws `LocaleDataException` when it has not — at the
+moment a date is drawn, which is every screen in the app. A launch-time step
+that a future translation change could quietly come to depend on is a worse
+trade than twenty-four extra rows.
+
+### 21. A notification is not written in the language of the request that caused it
+
+HR approves leave in English; the employee reads Spanish. The message is
+rendered by a **worker**, in a process with no request and no `Accept-Language`
+header at all — so the language cannot come from the request, and
+`app()->getLocale()` at send time is whoever pressed the button (C1.18).
+
+The framework already has the answer, and it is the only one that covers push,
+the notification centre and the email in one go: `User` implements
+`HasLocalePreference`, and `Illuminate\Notifications\NotificationSender` wraps
+every send in `withLocale($notifiable->preferredLocale())`. Nothing in a
+notification class knows about locales; they just call `__()`.
+
+`users.locale` is what fills it in, and **nobody types it**. `SetApiLocale`
+writes the header there in `terminate()`, so the column is a record of what
+somebody is actually being shown rather than a second preference to maintain. A
+null — every account that has only ever used the web dashboard — resolves to the
+default.
+
+**The notification *history* keeps the words it was written with.** A row
+written before somebody switched language stays in the old one. Translating on
+read instead would mean storing keys and parameters in `notifications.data`, a
+schema change that would also leave every existing row unreadable, for a payoff
+nobody has asked for.
+
+### 22. `*/` inside a docblock ends the docblock
+
+`` `lang/*/leave.php` `` in a comment closes the block four words early and the
+file stops parsing, with the error pointing at whatever line follows. Obvious in
+hindsight, ten minutes in practice. Write it as "the `leave.status`
+translations", or any other way that does not contain the sequence.
+
+### 23. The exception's own message outranked the translation
+
+`bootstrap/app.php` built the error payload as
+`$e->getMessage() ?: $message`, so that an `abort(403, 'That leave request is
+not yours.')` reached the client with its own wording rather than a generic
+"forbidden". Reasonable, and it quietly undid half of C1.18: the exceptions the
+framework raises **carry an English message of their own**.
+`AuthenticationException` is "Unauthenticated.", `AuthorizationException` is
+"This action is unauthorized.", `ThrottleRequestsException` is "Too Many
+Attempts." — so the two refusals a handset meets most often came back in English
+while everything around them was Spanish.
+
+Each arm of the `match` already decides what to say, including the one that
+prefers an abort's own message, so the payload takes `$message` and nothing
+else.
+
+**Nothing in the suite noticed**, and nothing was going to: 1154 tests and not
+one of them read the `message` on a refusal — they assert the status and the
+`error` code, which is exactly what the client is supposed to branch on. It took
+a `curl` against a running server. Two tests cover it now, and the general
+lesson is worth more than either: **a test suite that only asserts the fields a
+client acts on cannot see anything about the fields a person reads.**
+---
 ## Conventions
 
+- **A new message the API can return goes into `lang/en/` *and* `lang/es/`**
+  (C1.18). A missing key does not fail — it falls back to English and ships as
+  an English sentence inside a Spanish screen — so `ApiLocaleTest` compares the
+  two key sets, checks Laravel's own `validation.php` against the framework's,
+  and flags a Spanish row left as the English text pasted across. The `error`
+  code beside a message is **not** a translation: it is the contract, the client
+  branches on it, and it never changes. Reach for `Clock::time()` rather than
+  `format('h:i A')`: the meridiem is a translated string now.
+- **A new string goes into `mobile/lib/l10n/app_en.arb` *and* `app_es.arb`**
+  (B6.2). English is the template, so a key missing from the Spanish file falls
+  back to the English text and nothing fails — which is exactly why
+  `test/locale_test.dart` reads gen_l10n's own `untranslated.json` and fails
+  when it is not empty, and separately catches a row left as the English
+  sentence pasted across. Reach the strings with `context.t` (trap 19 says where
+  not to). `lib/l10n/generated/` is build output and git-ignored: `flutter pub
+  get` and every build regenerate it, so a fresh clone needs no extra step.
 - **Editing Blade files: use a `php <<'PHPEOF'` heredoc**, not the Edit tool and
   not inline `php -r`. The templates are tab-indented and the strings do not
   round-trip; nested quotes break in Git Bash.
@@ -154,6 +568,26 @@ $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));   // then move on
   through an attack. The counter is keyed on **email *and* IP**: on email alone
   one person's fat fingers would lock out a colleague behind the same office NAT
   address; on IP alone the whole office shares one budget.
+- **The offline cache only ever answers for a request that did not arrive.**
+  `OfflineCache.fetch` falls back to the saved copy on
+  `ApiException.isNetworkFailure` and rethrows everything else, because a
+  refusal *is* an answer: serving yesterday's roster over today's 403 hides an
+  account that has just lost its employee record. Two more rules go with it.
+  **Nothing that takes a decision is cached** — a leave balance from disk talks
+  somebody into booking days they no longer have, and an approvals inbox offers
+  a manager a request that was settled an hour ago. And **every saved copy is
+  labelled on screen** with when it was taken (`OfflineBanner`); a roster that
+  is quietly three days old is worse than no roster, because nobody is given a
+  reason to doubt it. Today's clock screen has a third rule of its own — it is
+  refused unless its `date` is still today, or it would greet somebody with
+  "clocked in since 09:00" from yesterday evening.
+- **The cache holds PII and is a plain file, so it is cleared with the token.**
+  `Session._clearToken` clears it alongside the punch queue, and `restore()`
+  clears it when there is no token at all — which is the only sweep that
+  catches a session ended by `logout-all` on another device. It never holds the
+  bearer token itself: `_cacheProfile` writes the `user` object only, and the
+  login response it comes from carries a token beside it. There is a test that
+  greps the file for one.
 - **Every new policy defaults to off.** `session_idle_timeout_minutes` (0),
   `enforce_geofence` (false), `require_two_factor_for_staff` (false). Each would
   otherwise change behaviour for a working installation on upgrade. They live in
@@ -306,6 +740,13 @@ the Settings screen.
   `App\Support\Totp` is hand-rolled and verified against the RFC 6238 vectors.
   Setup is by typed key, which every authenticator supports. When composer is
   unblocked, rendering the existing `otpauth://` URI as a QR is the only change.
+
+**The API answers in the caller's language** (C1.18). `SetApiLocale` reads
+`Accept-Language` on the API group only, so a web request is untouched. Three
+things stay in the language they were typed in, because they are data rather
+than vocabulary: leave types, office and department names, and the maintenance
+message on `GET /app/status`. `/privacy` and `/account-deletion` are web pages
+and are English too.
 
 **Inert until configured — neither is a code change:**
 

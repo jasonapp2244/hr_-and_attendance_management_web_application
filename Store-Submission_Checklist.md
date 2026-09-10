@@ -23,12 +23,17 @@ rejected without a human looking at it. See `Deployment-Guide_Production.md`.
 | Play listing icon, 512×512 | `mobile/store/play-listing-icon-512.png` |
 | App Store icon, 1024×1024 | `mobile/store/app-store-icon-1024.png` |
 | Release signing separate from the debug key | `android/app/build.gradle.kts` reads `key.properties` |
-| Permissions declared and used | `INTERNET`, `POST_NOTIFICATIONS` only |
+| Permissions declared and used | `INTERNET`, `POST_NOTIFICATIONS`, `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` (B2.3), `USE_BIOMETRIC` (B1.3). No `<uses-feature>` for the sensor — requiring the hardware would hide the app from every device without one |
+| iOS usage strings for both prompts | `NSLocationWhenInUseUsageDescription`, `NSFaceIDUsageDescription`. Missing either is a termination on a real device, not a refusal |
+| Biometric data leaves nothing to declare | The check is made by the OS; the app is told yes or no and stores only a per-handset on/off flag. Neither store's data form has a row to fill in for it |
 | Android 11 package visibility for links | `<queries>` https VIEW intent |
 | Auth token excluded from backup and transfer | `xml/data_extraction_rules.xml`, `xml/backup_rules.xml` |
 | Export-compliance answer | `ITSAppUsesNonExemptEncryption = false` in `Info.plist` |
 | Apple privacy manifest | `ios/Runner/PrivacyInfo.xcprivacy` — **see caveat below** |
 | Cleartext traffic blocked in release | `ApiClient.assertSecureBaseUrl()` refuses a non-https release build |
+| A way to retire a shipped build | `GET /app/status` (B6.6) — a server-side minimum version and a maintenance flag, both empty/off by default. Set `MOBILE_STORE_URL_ANDROID` / `MOBILE_STORE_URL_IOS` to the real listings once they exist, or the update screen has nowhere to send anybody and the gate declines to fire |
+| English and Spanish in the app | `mobile/lib/l10n/app_en.arb` and `app_es.arb` (B6.2). Every string, including the OS's own biometric prompt and the name in the task switcher. The app follows the phone's language by default and offers a picker on the Profile screen |
+| Accessibility — WCAG 2.1 AA | `mobile/test/accessibility_test.dart` (B6.4). Contrast is measured, not eyeballed: every colour clears 4.5:1 on the worst surface it meets, including its own tint. The OS font size is respected up to 2× with no clipping, and every icon-only control has a name. Both stores ask; Apple's review has rejected apps for text that vanishes at the larger accessibility sizes |
 
 ---
 
@@ -85,6 +90,16 @@ for every listing). App Store: 6.7" and 5.5" iPhone sets.
 The seeded demo company produces presentable screens. Take them after the server
 is up, since the app cannot reach data before then.
 
+**Both consoles list a language per set, and both let a listing declare more
+than one.** The app ships English and Spanish (B6.2), so the listing should say
+so — Play under *Store listing → Manage translations*, App Store under
+*Localizations* — and each language wants its own screenshots. A store page in
+one language for an app that opens in another is not a rejection, but it is the
+reason somebody uninstalls before the first sign-in.
+
+Switching the app for a Spanish set is a phone setting, not a build: change the
+handset's language, or pick Spanish on the Profile screen.
+
 ### 5. Fill in the data-safety and privacy forms
 
 Both must agree with `/privacy` and with `PrivacyInfo.xcprivacy` — a reviewer
@@ -97,21 +112,44 @@ compares them, and a mismatch is a rejection.
 | Employee ID, department, job title | Yes | No | App functionality | Yes |
 | Attendance times, worked hours, leave | Yes | No | App functionality | Yes |
 | IP address | Yes | No | Security / fraud prevention | Yes |
-| Approximate location | **No** — see below | — | — | — |
+| Precise location | Yes — see below | No | App functionality | Yes |
+| Crash logs / diagnostics | Yes — B6.5 | No | App functionality | Yes |
 | Advertising ID / analytics | No | No | — | — |
 
 Answer **no** to tracking on both forms: there is no advertising SDK, no
 analytics, and the only host the app contacts is the employer's own server.
 
+> **Crash logs (B6.5) are collected, and that answer stays "no third party".**
+> Crashes are written on the handset and posted to the employer's own server,
+> where an administrator reads them. There is no Crashlytics and no Sentry, and
+> **there should not be**: a stack trace routinely carries fragments of whatever
+> the app was holding, and sending those to a third party would falsify the "not
+> shared" column above, the `/privacy` page and `NSPrivacyTracking` in one go.
+> If a crash service is ever added, all four declarations change with it.
+
 Say data is encrypted in transit (yes), and that users can request deletion
 (yes, via `/account-deletion`).
 
-> **Location:** the server stores a coordinate when a punch arrives carrying
-> one, but the app has no location plugin wired and never sends one — so today
-> the honest answer is *not collected*. The moment B2.3 ships, this row, the
-> privacy page, `PrivacyInfo.xcprivacy` and both store forms all change
-> together. An app that starts collecting location without updating its
-> declaration is the single most common cause of an enforcement removal.
+> **Location — declare it, and declare it as precise.** B2.3 shipped: the app
+> reads a fix through `geolocator` at the moment of a punch and sends it with
+> the punch. It asks for `ACCESS_FINE_LOCATION` and
+> `NSLocationWhenInUseUsageDescription`, and the declaration describes what is
+> *asked for* rather than what the user then grants — so this is precise, not
+> approximate, even though a punch is recorded perfectly well without any fix
+> at all.
+>
+> It is **when in use** only. There is no `ACCESS_BACKGROUND_LOCATION` and no
+> `NSLocationAlwaysAndWhenInUseUsageDescription`, which is what keeps this off
+> the Play Console's sensitive-permission declaration path. Do not add either.
+>
+> Four descriptions of one behaviour have to agree, and a reviewer compares
+> them: this row, the `/privacy` page on the server, `PrivacyInfo.xcprivacy`,
+> and the data forms on both consoles. **This row said "not collected" for
+> some time after B2.3 shipped, and the Apple manifest omitted the entry
+> entirely** — nothing about that fails at build time, and an app that collects
+> location without declaring it is the single most common cause of an
+> enforcement removal. Re-read all four against the code before every
+> submission rather than trusting any one of them.
 
 ### 6. Notification permission — wired
 

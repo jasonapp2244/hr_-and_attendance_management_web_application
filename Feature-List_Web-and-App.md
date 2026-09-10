@@ -188,15 +188,15 @@ absence against working days only. Weekends and company holidays count as neithe
 # PART B — MOBILE APP (Android + iOS, Employee-facing)
 
 > Every screen below consumes the shared Laravel API (Part C), which is complete.
-> The app lives in `mobile/` — Flutter, nine screens, tested with 35 unit tests
-> and 10 integration tests driven against a live server.
+> The app lives in `mobile/` — Flutter, tested with 176 unit and widget tests
+> plus 10 integration tests driven against a live server.
 
 ## B1. Onboarding & Auth
 | # | Feature | Status |
 |---|---|---|
-| B1.1 | Splash + branded onboarding screens | 🟡 splash holds while the token is verified; no onboarding carousel |
+| B1.1 | Splash + branded onboarding screens | ✅ the splash holds while the token is verified, and a four-card introduction sits in front of the **first** sign-in on a handset. Each card answers a question somebody actually asks on their first day — is the recorded time mine or theirs, what happens on a site with no signal, where do I book a day off, will it tell me anything — rather than saying "Welcome!" over a stock illustration, which trains people to skip past the one useful card. **Skipping settles it as firmly as finishing does**: skipping is a decision about the app, not a request to be asked again next launch. The flag describes the *handset*, so unlike the punch queue, the offline cache and the biometric preference it is **not** cleared with the token — somebody signing back in at the end of a shift on a shared phone is not introduced to the app again. It is also never shown to a session that restored, whatever the keystore says. Every card scrolls and nothing has a fixed height, so it passes the 2× font-scaling check with the rest (B6.4) |
 | B1.2 | Login with email + password (Sanctum token) | ✅ |
-| B1.3 | Biometric unlock (fingerprint / Face ID) | ⬜ |
+| B1.3 | Biometric unlock (fingerprint / Face ID) | ✅ off until somebody switches it on in Profile, and the switch appears only on a handset with a biometric actually **enrolled** — on a phone with nothing but a PIN it would prompt for that PIN and call it a fingerprint. **Turning it on requires a check that passes first**, because saving the preference and then discovering the sensor refuses everybody locks its owner out of their own app, and the only way back is a reinstall — which also discards any punch still queued for a signal. For the same reason the lock screen always offers **Sign out instead**: fingerprints get removed and face data gets reset between one launch and the next, and a handset that can no longer say yes must not be the only way in. It engages before the splash lifts, not after the home screen has been drawn, and again when the app has been away for longer than a minute — long enough that the OS's own dialogs, the biometric sheet included, do not lock the app behind themselves. The device passcode is allowed as a fallback: it is already what protects the keystore the token lives in. The preference is on the handset, not the account, and is cleared with the token |
 | B1.4 | Forgot password flow | ✅ app requests the link; the link opens the web reset page, not a token screen in the app |
 | B1.5 | Stay-logged-in / secure token refresh | ✅ token in the device keystore, re-verified against `/auth/me` at launch |
 | B1.6 | Device registration & binding (one account ↔ trusted device) | ⬜ |
@@ -251,11 +251,17 @@ absence against working days only. Weekends and company holidays count as neithe
 > iOS needs, are the whole of what is left for B5.2 and B5.3 —
 > see `Push-Notifications_Setup.md`.
 >
-> **`route` is a contract between two lists, and they have drifted.** The server
-> sends `clock`, `leave`, `approvals` *and* `schedule`; `PushRoute` in the app
-> parses the first three. An unknown key opens the app normally rather than
-> crashing it, which is why the gap was silent — see B5.4. Add a route on the
-> server, add its enum row, or the notification lands nowhere in particular.
+> **`route` is a contract between two lists, and it drifted once.** The server
+> sent `clock`, `leave`, `approvals` *and* `schedule`; `PushRoute` in the app
+> parsed the first three, so every roster notification arrived and then landed
+> nowhere in particular. An unknown key opens the app normally rather than
+> crashing it, which is why the gap was silent for months — see B5.4.
+>
+> Both halves are now down to one list each. On the server every route comes
+> from `App\Support\AppRoute`, which the push payload and the notification
+> history (B5.6) both read; in the app every route — pushed or listed — is
+> parsed by the same `PushRoute` enum. Adding a route still means adding its
+> enum row, but there is now exactly one place on each side to look.
 
 | # | Feature | Status |
 |---|---|---|
@@ -264,17 +270,17 @@ absence against working days only. Weekends and company holidays count as neithe
 | B5.3 | Leave approved / rejected | ✅ end to end, both stages of the approval chain |
 | B5.4 | Schedule / roster updated | ✅ end to end. A9.5 had been sending `route: schedule` over FCM since it shipped; the app's `PushRoute` enum knew only `clock`, `leave` and `approvals`, so every roster notification arrived and then landed nowhere in particular. The enum row is added and the test now asserts one route per notification class on the server — the old one checked only the routes the app already knew, which is why it could never have caught this |
 | B5.5 | HR announcements & broadcasts | ⬜ |
-| B5.6 | In-app notification centre | 🟡 a snack bar for a message arriving with the app open; no history |
+| B5.6 | In-app notification centre | ✅ a bell on the Clock tab with an unread count, and the history behind it. Everything shown has been in the server's `notifications` table since A9 — this is `GET /notifications` and the app catching up with the web dashboard, not a new store. Until now a push that arrived while the phone was in a locker was simply gone: the OS banner is swiped away and the app kept nothing. **Reading and going somewhere are separate gestures here**, unlike the web screen where a click does both — on a phone the list *is* the destination for most of these, because the body is the whole message. Only the four keys every notification class agrees on are published, plus a route, so a new notification type on the server needs no app change to appear. **That route now comes from one mapping** (`App\Support\AppRoute`) used by both the push payload and the history: they were written out separately before, which is how `schedule` came to be sent for months to an app whose enum had never heard of it. A notification with nowhere to go — a document-expiry warning is addressed to HR, who work at a desk — simply offers no button rather than inventing a screen to point at. Marking one read is optimistic and a read for an id that is no longer there is not an error, because the app may be delivering a tap made offline |
 
 ## B6. App Experience
 | # | Feature | Status |
 |---|---|---|
 | B6.1 | Dark mode | ✅ light and dark themes, follows the system |
-| B6.2 | Multi-language support | ⬜ |
-| B6.3 | Offline-first cache of profile, history, roster | ⬜ |
-| B6.4 | Accessibility (font scaling, contrast) | ⬜ not audited |
-| B6.5 | Crash & analytics reporting | ⬜ |
-| B6.6 | Force-update / maintenance-mode gate | ⬜ |
+| B6.2 | Multi-language support | ✅ **English and Spanish, and the app follows the phone unless somebody says otherwise.** Flutter's own `gen_l10n` — no third-party package, which matters here because the privacy policy, the Apple manifest and both store data forms all say this app contacts exactly one host and carries no SDK that phones home. Roughly 360 strings, every one of them in `lib/l10n/*.arb`; `flutter analyze` cannot see a missing translation, so `test/locale_test.dart` reads gen_l10n's own untranslated report and fails when it is not empty, and separately catches a row left as the English text pasted across. **Dates are a message, not a concatenation** — Spanish writes "4 de agosto de 2026" — and month names come from the ARB rather than from `intl`'s `DateFormat`, which needs a locale-data load that throws at the moment a date is drawn if it was ever forgotten. **The language is a handset setting and survives sign-out**, unlike the token, the punch queue, the cache and the biometric preference: clearing it would put the login form back into a language the person standing there cannot read, on the one screen they cannot get past to fix it. Two identity bugs came out of this — `HomeShell` matched a tapped notification's route against the *label under the icon*, and `PushRoute.tabLabel` supplied it, so every notification would have opened nothing at all on a Spanish handset; both now match on a stable id. `Accept-Language` travels with every request, and the API answers in the same language now (C1.18) |
+| B6.3 | Offline-first cache of profile, history, roster | ✅ the last good answer from `/auth/me`, `/schedule`, `/attendance/history` and `/attendance/today` is kept, and served when — and **only** when — the request never arrived. A refusal is an answer: a 403 for an account that lost its employee record is shown, not papered over with yesterday's success. Every saved copy is labelled on screen with when it was taken, because a roster that is quietly three days old is worse than no roster. Today's clock screen additionally expires on its own — yesterday's copy is refused rather than telling somebody they are already at work — and the screen falls back to a punch button that queues, which is what makes B2.4 reachable at all: before this, the first refresh with no signal replaced that button with a "try again". The cache is cleared with the token on sign-out, and it never holds one. Nothing that takes a decision is cached — leave balances and approval inboxes would talk somebody into booking days they no longer have |
+| B6.4 | Accessibility (font scaling, contrast) | ✅ audited against WCAG 2.1 AA, and the audit is `mobile/test/accessibility_test.dart` rather than a document — it measures, so it cannot go stale. **Contrast:** the status palette was chosen against a white card and reused unchanged in dark mode, where `present`, `absent` and `leave` landed between 2.8:1 and 3.4:1 — under AA for the 11–13px text they are mostly used for, and under everything on the raised surfaces. There is no single value that satisfies both themes (readable on white needs a luminance below ~0.17, readable on #1E262E needs one above ~0.26), so there are now two palettes resolved by brightness, and every colour clears 4.5:1 on the worst surface it meets *including its own 10–15% tint*, which is the background these are usually drawn on. Separately, `primary` was the bright brand orange with white on it: 3.15:1, failing on every 16px button in the app — it is now the deeper orange in light mode and near-black-on-orange in dark, and the bright orange is reserved for the 21px Check-in label, the splash mark and the focus ring, where 3:1 is the bar. **Font scaling:** nothing clamps the OS text size and nothing should, but the punch button and the break button were laid out in fixed-height boxes and clipped at the larger settings — on the one control the app exists for — and two rows on the clock screen overflowed sideways. Five screens now render at 2× in both themes as a test; Flutter reports an overflow as an exception, so that is a real check rather than a screenshot somebody has to look at. **Screen readers:** every icon-only control has a name; one was missing a tooltip and announced only "button" |
+| B6.5 | Crash & analytics reporting | ✅ crash reporting. **Analytics is deliberately absent and should stay absent** — there is no advertising SDK and no analytics SDK, the app contacts exactly one host, and the privacy policy, the Apple privacy manifest and both store data forms all say so. **Crashes go to the employer's own server, not to Crashlytics or any third party**, for that same reason: a stack trace routinely carries fragments of whatever the app was holding, and shipping those to Google would falsify all three documents at once. A crash is written to the handset at the moment it happens — a reporter that posts from inside a dying process loses precisely the crash that killed it — and delivered on the next launch by `POST /app/crashes`, after the session restore so a signed-in handset's report says whose it was. The endpoint is unauthenticated on purpose: the crash worth having is the one that stops the app opening, and an authenticated one would collect every crash except that one. Reports are grouped server-side by a fingerprint of the exception plus the top few frames, so a hundred handsets on one bug read as one row, and are visible under **Administration → App Crash Reports** to whoever holds `manage-settings`. Nothing in the reporter is allowed to throw: an error handler that fails turns one crash into a loop |
+| B6.6 | Force-update / maintenance-mode gate | ✅ `GET /app/status`, asked at launch and again after a spell in the background. **The server decides and the app obeys** — the comparison lives on the server because the app is the half that cannot be fixed: a handset with a broken comparator has already shipped, and the answer it is given is the only thing left that can change its behaviour. **It fails open at every level**: an unreachable server, an unreadable answer, a verdict invented after the build shipped, a missing version, a platform with no store link — all of them carry on. That is the point rather than caution, because the app is deliberately usable with no signal, and a gate that blocked whenever it could not reach the server would take the offline cache and the punch queue away in exactly the conditions they were built for. Maintenance is a flag of its own rather than `php artisan down`, which returns 503 to everything and is indistinguishable from an outage — the app would fall back to its cache and queue punches into a server being migrated underneath it. Both settings are config, not database, because the moment they matter most is the moment the database is unavailable, and both are empty/off by default; `emp:preflight` fails a deploy that leaves maintenance on, or sets a minimum version with no store link to send anybody to |
 
 ## B7. Manager Mode (optional in-app role)
 | # | Feature | Status |
@@ -306,7 +312,16 @@ previous person's leave decisions; a tap opens the tab the notification is about
 rather than just the app. It stays silent until a Firebase project exists, and
 the app is entirely usable in that state.*
 
-*Not built: biometrics, and anything offline.*
+*The app opens with no signal at all. The last verified `/auth/me` is kept, so a
+handset that cannot reach the server restores the session from it rather than
+landing on a login screen that also needs the network — which is what had made
+the offline punch queue nearly unreachable in the case it exists for. That trust
+is bounded to a week: roles, permissions and whether somebody still works here
+are re-read on every launch that does reach the server, and past the grace the
+app asks for a sign-in instead of going on trusting what it last knew.*
+
+*And the handset can be held behind its own fingerprint or face check (B1.3),
+off by default, cleared with the token, and never the only way in.*
 
 ---
 
@@ -324,13 +339,14 @@ the app is entirely usable in that state.*
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
 | C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
-| C1.11 | Automated test suite (feature + unit) | ✅ 1066 tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role |
+| C1.11 | Automated test suite (feature + unit) | ✅ 1157 server tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role, plus 193 in the app — models, formatting, offline behaviour, the biometric lock, the gate, crash reporting, accessibility and the translations |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
 | C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
 | C1.15 | Push delivery to handsets (FCM v1) | ✅ channel alongside database and mail; silent until a service-account key is configured; deletes handsets FCM reports UNREGISTERED, keeps ones that merely 503'd |
 | C1.16 | Public privacy policy + account-deletion pages | ✅ no login required — both stores demand it before an app with accounts is listed |
 | C1.17 | Real-install setup, no demo data | ✅ `emp:install` creates the company and first admin, or attaches an admin to an existing company (`--company-id`); validated timezone, roles seeded, one transaction. `db:seed` now makes roles only. `emp:purge-demo --dry-run` clears a seeded database and names the real rows the cascade would take with it |
+| C1.18 | API messages in the caller's language | ✅ **English and Spanish, and not one line of the app changed** — `ApiErrorText.text` already showed the server's words as they arrived, which is what the header shipped in B6.2 was for. `SetApiLocale` reads `Accept-Language` on the API group only and **fails open at every level**: an unknown language, a malformed header, a `q=0`, none at all, all answer in English rather than refusing, because a preference is not a credential. Region is dropped — `es-MX` and `es-419` are `es`. Every message, every validation error (Laravel's own `validation.php`, translated whole and checked against the framework's so an upgrade that adds a rule fails the suite), the leave stage, the geofence refusal, and the meridiem on a pre-formatted punch time. **Notifications are the half a request cannot decide**, and the reason `users.locale` exists: a worker renders them with no request and no header, usually because of somebody else's action — HR approving leave in English decides what an employee reads in Spanish — so the language has to be a fact about the recipient, which `User::preferredLocale()` supplies to push, the notification centre and the email alike. Leave types, office names and the maintenance message stay as typed: they are data, not vocabulary |
 
 ---
 
@@ -357,7 +373,7 @@ the app is entirely usable in that state.*
 | **Stage 2** | A6 — Leave Management (web) | ✅ Done — no accrual engine, no calendar view |
 | **Stage 3** | A9 + C1.9 — Notifications + scheduler | ✅ Built — `MAIL_MAILER` is still `log`, so no mail leaves the box |
 | **Stage 4** | A5.5–A5.9 — finish Shift & Schedule | ✅ Done — planner is a grid, not drag-and-drop |
-| **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | 🟡 **In progress — the screens work and punches now carry GPS; biometrics and offline are missing** |
+| **Stage 5** | B1–B3 — Mobile app v1 (login, punch, self-service) | ✅ The screens work, punches carry GPS, the app is usable offline, and the handset can be held behind its own biometric check. What is still open across B1–B3 is optional or is a server job, not app v1: device binding (B1.6), the on-phone geofence and mock-location checks (B2.5, B2.7), a home-screen widget (B2.8), a calendar grid and a personal score (B3.4, B3.5), and the address and emergency-contact fields, which have no endpoint to write to |
 | **Stage 6** | B4–B5 — Leave + push in app | ✅ Leave and push both done. Push is silent until the Firebase project exists — console work, not code. One code exception: B5.4's `route: schedule` is sent but not parsed by the app |
 | **Stage 7** | A4.12–A4.15, A7.10–A7.14 | ✅ Attendance depth + reporting — correction, regularisation, overtime, break punches, payroll export, leave reports, scheduled delivery, report builder |
 | **Stage 8** | A1.7–A1.9, A2.3, A2.8, A4.16 | ✅ 2FA, the security trail, the idle timeout, the working-week editor and geofence enforcement |
@@ -369,8 +385,8 @@ the app is entirely usable in that state.*
 | **Stage 14** | The API catches up with the web | ✅ `/attendance/break`, `/documents`, `/attendance/regularisations`, `/directory`. Four features the web had shipped and the API had never exposed — every one of them had a status note naming an internal dependency that had long since been met |
 | **Stage 15** | The app catches up with the API | ✅ `PushRoute.schedule`, profile editing, the break button, My documents, Corrections and Colleagues. Every endpoint the API offers now has a screen behind it |
 | **Stage 16** | Roles behave the same on both halves | ✅ The Team-tab gate now needs the permission *and* a team, so HR and report-less managers no longer get an empty area. HR is desk-only by decision — see below |
-| **Stage 17** | Reliability — offline and biometrics | 🟡 **B2.4 offline punch queue done**, both halves. B6.3 offline cache and B1.3 biometric unlock remain |
-| **Stage 18** | Store readiness | ⬜ B6.2 multi-language, B6.4 accessibility audit, B6.5 crash reporting, B6.6 force-update gate, B1.1 onboarding, B5.6 notification history. None of it blocks a build; all of it is asked about at review |
+| **Stage 17** | Reliability — offline and biometrics | ✅ **B2.4 offline punch queue, B6.3 offline cache and B1.3 biometric unlock.** The app opens, reads and clocks with no signal, and a shared handset can be held behind its own fingerprint or face check without the phone ever becoming the only way in |
+| **Stage 18** | Store readiness | ✅ **All six rows done** — B6.6 the force-update and maintenance gate, B6.5 crash reporting, B6.4 the accessibility audit, B5.6 the notification centre, B1.1 the onboarding carousel and B6.2 multi-language. Five of them carry a server half or a test suite behind them rather than a document that goes stale: a preflight check, an administrator's crash screen, a history endpoint, an accessibility file that measures contrast and pumps six screens at 2× text, and a locale file that reads gen_l10n's own report of what is still untranslated. The library decision for B6.2 was Flutter's own `gen_l10n` and nothing else, for the same reason there is no crash SDK: four documents say this app carries nothing that talks to a third party |
 
 ### Roles on the phone (Stage 16)
 
@@ -420,10 +436,10 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
-| Mobile App (B) | 26 | 7 | 12 | 45 |
-| Backend / API (C) | 15 | 2 | 0 | 17 |
+| Mobile App (B) | 34 | 5 | 6 | 45 |
+| Backend / API (C) | 16 | 2 | 0 | 18 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **133** | **18** | **23** | **174** |
+| **Total** | **142** | **16** | **17** | **175** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none
@@ -434,9 +450,19 @@ out of scope.
 conditional rules engine (A2.9, A6.6), a drag-and-drop roster planner (A5.8), a
 per-shift break policy builder (A5.7), roster editing and attendance correction
 by managers (A10.11 — held with `manage-shifts` and `manage-attendance` on
-purpose), a team leave calendar in the app (B4.6), biometrics and offline
-punching (B1.3, B2.4, B6.3), and a QR image on the 2FA setup screen — the key can
-be typed in, which every authenticator supports.
+purpose), a team leave calendar in the app (B4.6), and a QR image on the 2FA
+setup screen — the key can be typed in, which every authenticator supports.
+
+**The web dashboard is English only, and deliberately so.** It is HR's and the
+administrator's screen; the workforce that needed Spanish is the one holding the
+phone. Every message the two halves share is a `__()` call now, so the strings
+are already there — what a Blade pass would still cost is the templates
+themselves, and nobody has asked for it.
+
+**Two smaller things a Spanish reader still meets in English**, both by
+decision: `/privacy` and `/account-deletion`, which are web pages the app links
+out to; and the leave types, office names and designations a company typed in,
+which are renamed rather than translated.
 
 **Two things are code-complete but inert until configured**, and neither is a
 code change: `MAIL_MAILER` is still `log`, so no email leaves the box; and push
@@ -453,6 +479,6 @@ than trusting the note.
 
 ---
 
-*Updated 2026-09-08 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-09-10 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
