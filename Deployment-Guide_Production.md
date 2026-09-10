@@ -317,6 +317,7 @@ One line, every minute; Laravel decides internally what is due. Without it:
 
 | Job | Cadence | What silently stops |
 |---|---|---|
+| `attendance:remind-checkin` | 5 min | Nobody is reminded their shift is about to start |
 | `attendance:remind-checkout` | 15 min | Nobody is reminded they are still clocked in |
 | `attendance:close-day` | hourly | Open punches are never closed; recorded hours stay wrong |
 | `db:backup --verify` | 02:10 daily | There are no backups at all |
@@ -581,12 +582,45 @@ against that exact string. The Android notification channel must be
 `hrms_default` (`config/fcm.php`) — Android 8+ silently drops any notification
 whose channel does not exist.
 
-The app itself is built: login, the punch button and status card, history,
-leave, roster and a manager tab, verified on an emulator against a live server.
-What it still needs from a deployed host is a real `API_BASE`, since a release
-build refuses to start pointed at a development address. See
-`Store-Submission_Checklist.md` for what the two stores still want.
+The app is finished, and has moved a long way since this section was first
+written. Beyond login, punching, history, leave, the roster and the manager tab
+it now carries the offline punch queue and offline cache, the biometric lock,
+the force-update and maintenance gate, crash reporting to this server, the
+notification centre, the first-run introduction, an audited accessibility pass,
+and English and Spanish throughout.
+
+What it still needs from a deployed host is a real `API_BASE`. A release build
+**refuses to start** pointed at a development address — `assertSecureBaseUrl`
+throws rather than letting a build ship that would hang on every screen:
+
+```bash
+flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build ipa       --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+```
+
+Nothing else has to be run first. The app's translations are generated from
+`mobile/lib/l10n/*.arb` by `flutter pub get` and by every build, so a fresh
+clone needs no extra step.
+
+Two server-side settings decide what a shipped handset does, and both are read
+from `.env` by `GET /app/status` (B6.6):
+
+- `MOBILE_MIN_VERSION` stops older builds at an update screen. Leave it empty
+  until the replacement is actually live in both stores — the people it stops
+  are the ones who clock in with it.
+- `MOBILE_STORE_URL_ANDROID` / `MOBILE_STORE_URL_IOS` are where that screen
+  sends them. `emp:preflight` refuses a minimum version with no link to go with
+  it, because an update screen with a dead button can be neither dismissed nor
+  acted on.
+
+See `Store-Submission_Checklist.md` for what the two stores still want — the
+screenshots and the data-safety forms both need this server up first, and both
+listings should declare English *and* Spanish.
 
 ---
 
-*Written 2026-08-03 against the live codebase. Companion files live in `deploy/`.*
+*Written 2026-08-03, and re-checked against the live codebase on 2026-09-11:
+the `php8.3-*` package list still covers every extension `composer.lock`
+requires, the `/var/www/emp` symlink layout matches what `deploy.sh` detects
+and what the systemd unit and cron expect, and `artisan down --render` resolves
+against the framework's own `errors::503`. Companion files live in `deploy/`.*

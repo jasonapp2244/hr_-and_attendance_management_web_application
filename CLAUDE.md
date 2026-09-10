@@ -15,7 +15,7 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1157 tests, ~160s, SQLite in memory
+php artisan test             # 1183 tests, ~130s, SQLite in memory
 
 cd ../mobile
 flutter analyze
@@ -529,6 +529,46 @@ one of them read the `message` on a refusal — they assert the status and the
 a `curl` against a running server. Two tests cover it now, and the general
 lesson is worth more than either: **a test suite that only asserts the fields a
 client acts on cannot see anything about the fields a person reads.**
+
+### 24. A roster time is a wall clock, and it was being read as UTC
+
+A shift stores `end_time = '17:00:00'` and means five o'clock **where the
+company is**. `shiftEndFor()` did `Carbon::parse($workDate.' '.$shift->end_time)`
+with no zone, which is five o'clock UTC — and both its callers compare the
+result against `now($company->tz())`, which is an **instant**, not a wall clock.
+Carbon compares instants, so the two silently disagreed by the company's offset.
+
+For a company four hours behind, "has the shift ended?" answered yes four hours
+early: `attendance:remind-checkout` nudged people at lunchtime, and
+`attendance:close-day` wrote an automatic clock-out — with the *scheduled*
+hours — while they were still working. Every test passes because every test
+company is on `UTC`, where the bug does not exist. The seeded install is UTC
+too, so it would have surfaced on the first non-UTC client and nowhere before.
+
+Both helpers now parse in `tzFor($employee)`. Note the one that must **not**:
+`scheduledMinutesFor()` measures a duration, and a zone applied to one end and
+not the other turns an eight-hour shift into a four-hour one — both sides there
+are parsed the same way, deliberately.
+
+`config('app.timezone')` being UTC is correct and must stay that way (see
+"Running it"). That is exactly why anything holding a *company's* wall clock has
+to say so at the point it is parsed.
+
+### 25. A scheduled window can fall between two runs
+
+B5.1's clock-in reminder fires inside `[start − lead, start)` — a window that
+closes, unlike every other job here, which fires once a moment has passed and
+can afford to be late. With the quarter-hourly cadence the other attendance jobs
+use and the default ten-minute lead, an 09:00 shift's window is 08:50–09:00: the
+08:45 run is too early and the 09:00 run is too late. **Nobody is ever
+reminded** — no error, no log, no failing test, for every employee, forever.
+
+`attendance:remind-checkin` is scheduled `everyFiveMinutes()` and
+`PolicyController` refuses a lead between 1 and 4 minutes so the two ends cannot
+drift apart. If the cadence is ever slowed, the validation has to move with it.
+The general shape: **a job whose window closes needs an interval shorter than
+the shortest window it can be asked for**, and the coupling has to be written
+down at both ends because nothing enforces it at runtime.
 ---
 ## Conventions
 
