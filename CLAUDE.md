@@ -15,7 +15,7 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1183 tests, ~130s, SQLite in memory
+php artisan test             # 1212 tests, ~135s, SQLite in memory
 
 cd ../mobile
 flutter analyze
@@ -569,6 +569,39 @@ drift apart. If the cadence is ever slowed, the validation has to move with it.
 The general shape: **a job whose window closes needs an interval shorter than
 the shortest window it can be asked for**, and the coupling has to be written
 down at both ends because nothing enforces it at runtime.
+### 26. A new permission cannot arrive by re-running the seeder
+
+`RolePermissionSeeder` ends in `syncPermissions()`, which is right for a fresh
+database and wrong for a live one: it does not add, it **replaces**. A client who
+had taken `export-reports` away from HR through the Roles & Permissions editor
+(A1.4) would find it handed back on the next deploy.
+
+Which is why `deploy/deploy.sh` runs `migrate --force` and no seeder at all — and
+why a permission added to the seeder alone reaches a fresh install and every
+test, and **never reaches a running server**. The menu simply would not appear,
+with nothing in any log to say why.
+
+So a new permission is declared in two places, on purpose: the seeder for a new
+database, and a data migration using `givePermissionTo` — additive, idempotent,
+leaving every other grant as the administrator left it — for the ones already
+out there. See `2026_09_11_000002_add_manage_announcements_permission.php`.
+
+The path that matters in production is also the one `RefreshDatabase` cannot
+reach, since migrations run before the seeder and the roles do not exist yet.
+`AnnouncementTest` calls the migration's `up()` by hand for that reason.
+
+### 27. A broadcast has no undo, so the model has to say so
+
+Publishing an announcement (B5.5) writes a row into every recipient's
+`notifications` table and pushes to every registered handset. Neither can be
+recalled, so the register's own copy is refused an edit **on the model**, not
+just in the controller — `booted()` throws on `updating` and `deleting` once
+`published_at` is set, the same rule the attendance and activity trails keep.
+The controller catches it and turns the exception into the sentence explaining
+why; a console command or a future endpoint gets the exception.
+
+`publish()` is the one caller allowed past the guard, and it goes through
+`forceFill(...)->saveQuietly()`.
 ---
 ## Conventions
 

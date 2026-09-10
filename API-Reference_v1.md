@@ -1066,6 +1066,21 @@ Only the four keys every notification class agrees on are published — `type`,
 `url` and per-class extras; neither is returned, so a new notification type
 needs no client change to appear here.
 
+#### `type: "announcement"` (B5.5)
+
+An HR broadcast, and the one row here whose words are **not the system's**. Every
+other `title` and `body` is a translated string rendered in the recipient's
+language; this one is what a person typed, delivered exactly as typed. A machine
+translation of "the Croydon depot closes at 2pm on Friday" is a liability rather
+than a courtesy, and whoever wrote it knows who reads what.
+
+Its `route` is **null**, and for a different reason from the HR-facing ones
+above: the body *is* the message and this list already shows it in full, so
+there is nowhere else to go. The push carries only the first 180 characters —
+an oversized FCM data payload is a failed send for every recipient rather than
+a long notification — so a client must read the body from here, never from the
+push.
+
 ### `POST /notifications/{id}/read`
 
 Marks one read. Answers `{ "ok": true, "unread": 2 }`.
