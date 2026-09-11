@@ -337,12 +337,12 @@ off by default, cleared with the token, and never the only way in.*
 | C1.6 | Device token registration for push | ✅ register/list/unregister; cleared on sign-out. Delivery is Phase 5 |
 | C1.7 | API rate limiting + throttling | ✅ per-user limiters — 120/min ceiling, login 5, punch 20, writes 30 |
 | C1.8 | Consistent JSON error format + API versioning (`/api/v1`) | ✅ |
-| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | 🟡 three scheduled jobs; queued notifications survive a deleted record and retry a bad send. The cron line and the worker unit are written (`deploy/`) but not yet installed on a server |
+| C1.9 | Queue worker + scheduler (reminders, auto-absent, reports) | ✅ **installed and running** on `hrams.devonlinetestserver.com` — `emp:preflight` reports the scheduler last ran seconds ago and the queue empty with no failed jobs. Cron-driven rather than systemd (`HOSTING_MODE=managed`, `deploy/emp-webspace.cron`), because the host is managed webspace with no systemd; that setting also widens the preflight tolerance from five minutes to fifteen, which is normal for cron and alarming for a daemon. Queued notifications survive a deleted record and retry a bad send. Nothing they send leaves the box while `MAIL_MAILER=log` |
 | C1.10 | Immutable audit log for attendance records | ✅ punches are append-only (edit/delete refused); every write records actor, source, IP and a full snapshot |
 | C1.11 | Automated test suite (feature + unit) | ✅ 1235 server tests covering attendance, leave, roster, swaps, the API, the audit trail, password reset, push, backups, install, employee import, preflight and the manager role, plus 198 in the app — models, formatting, offline behaviour, the biometric lock, the gate, crash reporting, accessibility and the translations |
 | C1.12 | API documentation (Scribe / OpenAPI) | ✅ `API-Reference_v1.md`, kept honest by a test that walks the route table |
 | C1.13 | Database backup & restore strategy | ✅ `db:backup --verify` nightly — dumps, restores into a scratch database to prove it reads back, then rotates |
-| C1.14 | Production deployment (HTTPS, env hardening) | 🟡 written, not run — `deploy/` scripts, nginx + systemd + cron, `.env.production.example`, `emp:preflight` and `Deployment-Guide_Production.md`. No server exists yet |
+| C1.14 | Production deployment (HTTPS, env hardening) | ✅ **live at `https://hrams.devonlinetestserver.com`** — managed webspace, cron-driven queue and scheduler (`HOSTING_MODE=managed`), TLS clean, `/api/v1/ping` answering `{"ok":true,"service":"KEMP"}`, and `/privacy` and `/account-deletion` both reachable logged out, which is what the two stores fetch. Updates ship with `ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh` — the flag because the box's `.env` says `staging` and the script refuses to guess which database to migrate. **`emp:preflight` is not green on it and should not be read as if it were**: the demo quick-login panel and the seeded `password` accounts are live on a public URL, `MAIL_MAILER` is still `log`, and `TRUSTED_PROXIES` is unset behind Varnish so every punch records the proxy's IP rather than the employee's |
 | C1.15 | Push delivery to handsets (FCM v1) | ✅ channel alongside database and mail; silent until a service-account key is configured; deletes handsets FCM reports UNREGISTERED, keeps ones that merely 503'd |
 | C1.16 | Public privacy policy + account-deletion pages | ✅ no login required — both stores demand it before an app with accounts is listed |
 | C1.17 | Real-install setup, no demo data | ✅ `emp:install` creates the company and first admin, or attaches an admin to an existing company (`--company-id`); validated timezone, roles seeded, one transaction. `db:seed` now makes roles only. `emp:purge-demo --dry-run` clears a seeded database and names the real rows the cascade would take with it |
@@ -424,12 +424,32 @@ phone approvals later it is an additive change — a company-wide endpoint gated
 on the `hr` **role** rather than the `approve-leave` permission, which managers
 share — and not a rework of anything here.
 
-### The one thing gating the rest
+### The thing that used to gate the rest, and what replaced it
 
-**C1.14 — deploy to a real domain.** A handset cannot resolve `127.0.0.1`, FCM will
-not call back a laptop, and neither store accepts a privacy-policy URL pointing at
-localhost. Push (B5), store submission and real-device testing all sit behind it,
-and the scripts to do it are already written. See `Deployment-Guide_Production.md`.
+**C1.14 is done.** The app is live at `https://hrams.devonlinetestserver.com`.
+A handset could not resolve `127.0.0.1`, FCM would not call back a laptop, and
+neither store accepts a privacy-policy URL pointing at localhost — all three are
+now answered by a real domain with a clean certificate. Store submission and
+real-device testing are unblocked.
+
+**What gates the rest now is three settings on that box, not code.** Every one
+of them is a line in `.env` and a `config:cache`:
+
+1. **The demo quick-login panel is ON at a public URL, and `admin@hrms.test`
+   still has the seeded password.** One click on the login page is full admin —
+   employee records, the document vault with passport scans, every punch. This
+   is the one to fix today; the rest can wait.
+2. **`MAIL_MAILER=log`.** Password resets, leave decisions, scheduled reports
+   and document-expiry warnings are all built, tested and queued, and all go
+   nowhere.
+3. **`TRUSTED_PROXIES` is unset behind Varnish**, so `attendance_logs` is
+   recording the proxy's address on every punch. The audit trail (C1.10) and the
+   IP column in exports (A7.9) are both quietly wrong, and nothing errors to say
+   so.
+
+Push (B5) additionally needs the Firebase project, which is console work rather
+than a setting. See `Deployment-Guide_Production.md` and
+`Store-Submission_Checklist.md`.
 
 ---
 
@@ -439,9 +459,9 @@ and the scripts to do it are already written. See `Deployment-Guide_Production.m
 |---|---|---|---|---|
 | Web Dashboard (A) | 92 | 9 | 4 | 105 |
 | Mobile App (B) | 37 | 4 | 4 | 45 |
-| Backend / API (C) | 16 | 2 | 0 | 18 |
+| Backend / API (C) | 18 | 0 | 0 | 18 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **145** | **15** | **15** | **175** |
+| **Total** | **147** | **13** | **15** | **175** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
 delivered. Four planned rows and nine partial ones remain across Part A, and none

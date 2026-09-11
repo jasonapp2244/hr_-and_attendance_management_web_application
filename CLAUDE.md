@@ -873,7 +873,24 @@ and are English too.
 
 ## Deploying
 
-**No production server exists yet.** The tooling is written and tested:
+**The app is live at `https://hrams.devonlinetestserver.com`** — permanent, not a
+staging step on the way to somewhere else. It is managed webspace (CloudPanel,
+Varnish in front, no systemd), so the queue and the scheduler are cron-driven
+and `HOSTING_MODE=managed` is what keeps `emp:preflight` from failing a healthy
+cron queue on a daemon's five-minute tolerance.
+
+Ship a revision with:
+
+```bash
+cd /home/devonlinetestserver-hrams/htdocs/hrams.devonlinetestserver.com
+ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh
+```
+
+**The flag is required and is not a workaround.** That box's `.env` says
+`APP_ENV=staging`, and `deploy.sh` refuses to run rather than guess which
+database to migrate. Leave it saying staging: setting it to `production` would
+also switch preflight from advisory to blocking, and it would then fail the
+deploy on `MAIL_MAILER=log`.
 
 - `Deployment-Guide_Production.md` — the runbook.
 - `deploy/` — nginx config, the systemd worker unit, the cron line, `deploy.sh`.
@@ -881,6 +898,21 @@ and are English too.
 - `php artisan emp:preflight` — gates a deploy. Fails on debug-on,
   `MAIL_MAILER=log`, a localhost or http `APP_URL`, the sync queue, no recent
   backup, a bad company timezone, the demo panel left on, and seeded passwords.
+
+**Preflight is not green on that box, and the failures are real.** As of the
+first deploy there: the demo quick-login panel is ON at a public URL and
+`admin@hrms.test` still carries the seeded password `password`, which together
+are one click to full admin for anybody who finds the URL; `MAIL_MAILER` is
+`log`; and `TRUSTED_PROXIES` is unset behind Varnish, so every punch records the
+proxy's IP instead of the employee's and neither the audit trail nor the IP
+column in exports is telling the truth. All three are `.env` lines plus a
+`config:cache`.
+
+**`db:backup --verify` cannot verify on this host.** The panel's database user
+cannot `CREATE DATABASE`, so the scratch restore is skipped with a warning and
+the dump is written but unproven. That is handled — the command warns rather
+than failing the deploy — but it means the nightly dumps are not actually known
+to restore. Prove one by hand occasionally on a machine that can.
 
 **The database dump is not the whole backup.** Contracts, ID scans and employee
 photos live on disk (`storage/app/employee-documents/`, `storage/app/public/avatars/`).

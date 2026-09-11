@@ -22,10 +22,18 @@ hosting comes first and then the app is built once.
 
 ## What you need before starting
 
+> **This first-time setup has already been done.** The app is live at
+> `https://hrams.devonlinetestserver.com`, on managed webspace with Varnish in
+> front and no systemd, at
+> `/home/devonlinetestserver-hrams/htdocs/hrams.devonlinetestserver.com`.
+> To ship a revision, skip to *Shipping a new revision* — or just run
+> `ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh` from that directory. The rest
+> of this section is kept for rebuilding the host, or standing up a second one.
+
 | | |
 |---|---|
 | A Linux server | 2 vCPU / 4 GB is comfortable for a few hundred employees. Ubuntu 22.04 or 24.04 assumed below. |
-| The domain | `emp.klutchcleaning.com` — this subdomain, not another. Its A record must already point at the server's IP, and DNS must resolve **before** you request a certificate. |
+| The domain | `hrams.devonlinetestserver.com` — this subdomain, not another. Its A record must already point at the server's IP, and DNS must resolve **before** you request a certificate. |
 | An SMTP provider | Postmark, SES, Mailgun or Resend. Not the host's own sendmail — a new server's IP has no sending reputation and its mail lands in spam. |
 | SSH root access | For the one-time setup only. |
 
@@ -288,7 +296,7 @@ sudo ln -s /etc/nginx/sites-available/emp /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 sudo nginx -t && sudo systemctl reload nginx
 
-sudo certbot --nginx -d emp.klutchcleaning.com
+sudo certbot --nginx -d hrams.devonlinetestserver.com
 ```
 
 The web root is `/var/www/emp/public`, never `/var/www/emp`. Pointing nginx at
@@ -375,13 +383,13 @@ preflight also refuses.
 
 Then by hand:
 
-- `https://emp.klutchcleaning.com` loads over TLS and the padlock is clean
+- `https://hrams.devonlinetestserver.com` loads over TLS and the padlock is clean
 - Log in as the administrator you created
 - Check in and out once, and confirm the punch shows **your** IP rather than
   `127.0.0.1` — this is the proxy setting working
 - Take a real backup: `sudo -u www-data php artisan db:backup --verify`
 - Send a real email: submit a leave request and confirm it arrives
-- `https://emp.klutchcleaning.com/privacy` and `/data-deletion` load while logged out
+- `https://hrams.devonlinetestserver.com/privacy` and `/data-deletion` load while logged out
 
 That last one matters for the next phase — both stores require a publicly
 reachable privacy policy, checked while signed out.
@@ -453,7 +461,7 @@ Note the host it gives you — on webspace it is usually *not* `127.0.0.1` — a
 put that in `DB_HOST`. Skip the `vrfy\_%` grant; you cannot use it here.
 
 **5. TLS is issued from the panel**, not certbot. Point the document root of
-`emp.klutchcleaning.com` at the `public/` directory of the checkout — the
+`hrams.devonlinetestserver.com` at the `public/` directory of the checkout — the
 subdomain is already created and aimed at the webspace, so this is the only
 setting left on it. This is the one setting that
 must be right: a document root at the project directory serves `.env` and
@@ -570,7 +578,7 @@ whole box is.
 With this done, Part C is complete and Stage 5 can start. The Flutter app has
 what it needs:
 
-- `https://emp.klutchcleaning.com/api/v1` — 25+ endpoints, documented in
+- `https://hrams.devonlinetestserver.com/api/v1` — 25+ endpoints, documented in
   `API-Reference_v1.md`
 - Sanctum token auth, per-user rate limits, one JSON error shape
 - Push delivery server-side, waiting only on a Firebase project
@@ -594,8 +602,8 @@ What it still needs from a deployed host is a real `API_BASE`. A release build
 throws rather than letting a build ship that would hang on every screen:
 
 ```bash
-flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
-flutter build ipa       --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build appbundle --dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1
+flutter build ipa       --dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1
 ```
 
 Nothing else has to be run first. The app's translations are generated from

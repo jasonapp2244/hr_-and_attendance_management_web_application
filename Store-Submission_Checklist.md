@@ -3,10 +3,22 @@
 What the two stores require, what the repository already satisfies, and what is
 left. Written against the app in `mobile/` and the Laravel server in `hrms/`.
 
-The **blocking** item is not on this list: none of it can be submitted until the
-server is deployed at a real HTTPS domain (`C1.14`). Both stores fetch the
-privacy-policy URL during review, and a listing pointing at `localhost` is
-rejected without a human looking at it. See `Deployment-Guide_Production.md`.
+**The server is live and that blocker is gone.** `https://hrams.devonlinetestserver.com`
+serves over TLS, `/privacy` and `/account-deletion` both load logged out — which
+is exactly what the two stores fetch during review — and `/api/v1/ping` answers
+`{"ok":true,"service":"KEMP","version":"v1"}`.
+
+Two consequences for everything below:
+
+- **Every build must point at that domain**, not the one this document used to
+  name: `--dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1`.
+  A release build refuses to start on a non-https base URL, so a wrong one
+  fails loudly rather than shipping.
+- **The demo quick-login panel is currently ON at that public URL**, with
+  `admin@hrms.test` still on the seeded password. Turn it off before you hand
+  the URL to a store reviewer — a reviewer who lands on a login page offering
+  one-click admin will take it, and what they find is not the app you are
+  submitting.
 
 ---
 
@@ -95,7 +107,7 @@ no themed-icon support. Re-add it afterwards — the file carries a warning sayi
 so — and confirm it survived into the bundle:
 
 ```bash
-flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build appbundle --dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1
 unzip -p build/app/outputs/bundle/release/app-release.aab \
       base/res/mipmap-anydpi-v26/ic_launcher.xml | strings | grep monochrome
 ```
@@ -207,8 +219,8 @@ The default API base is the emulator's view of a development machine. A release
 build must override it, and will refuse to start if it does not:
 
 ```bash
-flutter build appbundle --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
-flutter build ipa       --dart-define=API_BASE=https://emp.klutchcleaning.com/api/v1
+flutter build appbundle --dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1
+flutter build ipa       --dart-define=API_BASE=https://hrams.devonlinetestserver.com/api/v1
 ```
 
 Play takes the `.aab`, not an APK.
