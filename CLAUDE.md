@@ -15,11 +15,11 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1212 tests, ~135s, SQLite in memory
+php artisan test             # 1235 tests, ~175s, SQLite in memory
 
 cd ../mobile
 flutter analyze
-flutter test                 # 193 tests
+flutter test                 # 198 tests
 ```
 
 The app's strings are generated from `mobile/lib/l10n/*.arb` on `flutter pub
@@ -602,6 +602,40 @@ why; a console command or a future endpoint gets the exception.
 
 `publish()` is the one caller allowed past the guard, and it goes through
 `forceFill(...)->saveQuietly()`.
+### 28. A score of zero and no score at all are different answers
+
+B3.5's attendance score is `ontime / obliged`, and `obliged` is legitimately
+zero — a window of weekends, a fortnight of booked leave, somebody's first week
+before they started. Returning 0 for that is arithmetically defensible and
+completely wrong in front of a person: it reads as a failure, and the person
+most likely to see it is somebody just back from leave.
+
+`scorePercent()` returns **null**, the API sends `null`, and the card draws
+"No score yet" with a line saying why. The same rule applies to anything else
+here that divides by a count of days.
+
+The other half is the streak, and the trap there is the opposite: an unfinished
+day is not an absence. Counting today against somebody before the day is over
+would show every employee in the company a zero every morning — the feature
+working perfectly and being useless. `onTimeStreak()` skips today when there is
+no punch yet, and counts it the moment there is one.
+
+### 29. The 2x accessibility pass only covers the screens pointed at it
+
+`test/accessibility_test.dart` pumps screens at `TextScaler.linear(2.0)` in both
+themes, and an overflow is a rendering exception, so it fails rather than
+producing a screenshot nobody looks at. That only works for screens that are in
+the file — and a screen needing an API was not, which is why B3.5's score card
+shipped its first draft with a `Row` that overflowed by 180 pixels at the
+largest text size.
+
+A screen that loads from the server is pumped by **seeding the offline cache
+and letting the mock client throw** — `offlineSession(tester, history: {...})` —
+the same trick the clock screen already used. There is no reason left for a
+screen to be missing from that file.
+
+A `Wrap` is not enough on its own: it wraps its own children, not the contents
+of a `Row` inside one. Text beside an icon needs `Flexible`.
 ---
 ## Conventions
 

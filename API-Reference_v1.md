@@ -569,7 +569,8 @@ Maximum window: **92 days**.
       "first_in": "2026-07-30T16:57:07-04:00", "last_out": null,
       "worked_minutes": 0, "punches": 1, "holiday": null }
   ],
-  "totals": { "present_days": 1, "late_days": 1, "leave_days": 0, "absent_days": 3, "worked_minutes": 0 }
+  "totals": { "present_days": 1, "late_days": 1, "leave_days": 0, "absent_days": 3, "worked_minutes": 0 },
+  "score": { "score": 25, "ontime_days": 1, "obliged_days": 4, "streak": 0 }
 }
 ```
 
@@ -586,6 +587,33 @@ Maximum window: **92 days**.
 
 A day never clocked out of reports `worked_minutes: 0` — there is no honest
 number for a stretch that was never closed.
+
+#### `score` — the personal attendance score and streak (B3.5)
+
+Two numbers with deliberately different shapes, and a client that treats them
+alike will get one of them wrong.
+
+| Field | Notes |
+|---|---|
+| `score` | 0–100, or **`null`**. Of the days in this window the employee was meant to be here, the percentage they made on time. |
+| `ontime_days` | The numerator. Days with a punch and no `late` flag. |
+| `obliged_days` | The denominator. Days whose `status` is `present` or `absent` — every other status is a day nobody expected them. |
+| `streak` | Consecutive days arrived on time, counting back from **today**. Ignores `from` and `to` entirely. |
+
+`null` is a real answer and **must not be rendered as zero**: a window of
+weekends, or a fortnight of approved leave, has no score, and zero reads as a
+failure to the person least deserving of one. `obliged_days: 0` is the tell.
+
+The score is derived from the `days` array above rather than recomputed, so a
+client can always account for it by pointing at the rows; showing a number that
+disagrees with the list beneath it would be worse than showing none.
+
+`streak` is **not** a property of the window. The app offers 7, 30 and 92-day
+ranges and the score follows whichever is chosen; the streak does not, because
+"eleven days" has to mean eleven days. Weekends, company holidays, approved
+leave and rostered days off neither break it nor extend it, and **today is only
+ever counted, never held against them** — asked at nine in the morning before
+anybody has clocked in it still reports yesterday's streak.
 
 **Failures:** `invalid_range` (422) · `range_too_large` (422) · `validation_failed` (422)
 
