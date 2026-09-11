@@ -285,7 +285,7 @@ absence against working days only. Weekends and company holidays count as neithe
 ## B7. Manager Mode (optional in-app role)
 | # | Feature | Status |
 |---|---|---|
-| B7.1 | Team attendance today | ✅ present vs in-now reported separately |
+| B7.1 | Team attendance, today **and any past day** | ✅ present vs in-now reported separately, and the board now carries the day it is answering for. `GET /team/attendance` had taken a `date` since it shipped and the app only ever asked for today, so a manager holding a handset could not answer *"was she in yesterday?"* — the question that actually gets asked when somebody is missing this morning — while the web manager area had the same board with a date on it all along (A10.4). The forward arrow is **disabled on today rather than left to fail**: the endpoint refuses a future date, and a control that reliably produces an error is a trap, which is the same reason the corrections picker stops there. Today is sent explicitly rather than left to the server's default, so a handset left open across midnight cannot refresh into a day its own header does not name |
 | B7.2 | Approve leave / regularisation from phone | ✅ **leave only, and settled** — a correction is HR's alone, not a manager's. Leave approval is manager-then-HR; regularisation has no manager step, so an approve button in the manager tab would advertise a stage that does not exist. The employee half is `POST /attendance/regularisations` (A4.13 on the API); deciding stays on the web behind `manage-attendance` |
 | B7.3 | Team roster view | ✅ `GET /team/roster` plus a Roster tab in the app — a week per direct report, published days only, with leave outranking a rostered shift |
 
