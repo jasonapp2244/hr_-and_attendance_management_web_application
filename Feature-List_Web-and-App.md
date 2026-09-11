@@ -1,6 +1,6 @@
-# Employment Management Portal — Master Feature List (Web + Mobile App)
+# KEMP — Master Feature List (Web + Mobile App)
 
-**Project:** Employment Management Portal
+**Project:** KEMP — Klutch Employment Management Program (formerly the Employment Management Portal)
 **Prepared for:** Alfonzo
 **Stack:** Laravel 12 + MySQL · Blade/Bootstrap (SmartHR) web · Flutter app on the same Laravel API
 **Date:** 2026-08-04
@@ -387,6 +387,8 @@ off by default, cleared with the token, and never the only way in.*
 | **Stage 16** | Roles behave the same on both halves | ✅ The Team-tab gate now needs the permission *and* a team, so HR and report-less managers no longer get an empty area. HR is desk-only by decision — see below |
 | **Stage 17** | Reliability — offline and biometrics | ✅ **B2.4 offline punch queue, B6.3 offline cache and B1.3 biometric unlock.** The app opens, reads and clocks with no signal, and a shared handset can be held behind its own fingerprint or face check without the phone ever becoming the only way in |
 | **Stage 18** | Store readiness | ✅ **All six rows done** — B6.6 the force-update and maintenance gate, B6.5 crash reporting, B6.4 the accessibility audit, B5.6 the notification centre, B1.1 the onboarding carousel and B6.2 multi-language. Five of them carry a server half or a test suite behind them rather than a document that goes stale: a preflight check, an administrator's crash screen, a history endpoint, an accessibility file that measures contrast and pumps six screens at 2× text, and a locale file that reads gen_l10n's own report of what is still untranslated. The library decision for B6.2 was Flutter's own `gen_l10n` and nothing else, for the same reason there is no crash SDK: four documents say this app carries nothing that talks to a third party |
+| **Stage 19** | The submission bundle itself | ✅ **Five defects that no test could see, because none of them is code that runs.** `PrivacyInfo.xcprivacy` was a file in a folder and not in the iOS target, so every build shipped without it and Apple auto-rejects on that alone. `ACCESS_FINE_LOCATION` implies a **required** GPS `<uses-feature>`, which had been quietly filtering the Play listing off every device without the hardware — an app nobody could find rather than one that failed. The 512×512 Play icon was a crop of one corner of the mark. There was no 1024×500 feature graphic, which Play requires on every listing. And the adaptive icon had no `<monochrome>` layer, so a themed Android 13+ home screen left this app the one orange tile in a recoloured grid. All five verified in a real `bundleRelease` and against the merged manifest. Also written down for the first time: the reviewer sign-in account both consoles demand for a login-only app, and the console forms — content rating, app access, EU trader status, Play's 12-tester closed test — that block a release while the code sits finished. The app is also now declared **iPhone-only** — `TARGETED_DEVICE_FAMILY = 1` in all three configurations and no `~ipad` orientation key — which drops the 13" iPad screenshot set and the reviewer opening it on hardware nobody has laid it out for. See `Store-Submission_Checklist.md` |
+| **Stage 20** | KEMP brand mark | ✅ The client's icon set applied across both halves. The supplied artwork is a **pre-rounded plate on transparency**, which is the wrong shape for a launcher and illegal for Apple — an alpha channel on an App Store icon is a rejection — so two masters are derived from it rather than handing it over as-is: an opaque full-bleed square for iOS and legacy Android, and the mark keyed off its navy for the Android adaptive foreground, sitting on `#052C6E` so any navy missed at an anti-aliased edge is invisible against the layer beneath it. `flutter_launcher_icons` regenerates every density from those two, then **silently rewrites `ic_launcher.xml` and drops the `<monochrome>` block** — it has no themed-icon support — so that layer is restored and verified inside the built `.aab`, not just in the source tree. The three store images are cut from the same master by hand, since that command does not touch them. On the web the sidebar, header and collapsed marks and the favicon all move from the Klutch Cleaning company logo to the KEMP lockup, with a white-wordmark variant for the dark sidebar — recoloured from the divider rightwards only, because whitening the whole lockup fills the plate solid and swallows the K inside it. Eight hardcoded `alt="Klutch Cleaning"` strings now read `config('app.name')`. The app itself is renamed **KEMP** — the Android label, both iOS bundle-name keys and `appTitle` in both ARB files, where Spanish carries the identical string because a brand is not translated; `locale_test.dart` already exempts rows under 20 letters for exactly that reason, so the suite stays honest rather than being loosened for it. The bundle id `com.hrms.attendance` stays as it is: not user-visible, and unchangeable after a first upload. **The app's interior stays brand orange** by decision: that palette is what `accessibility_test.dart` measures at 4.5:1 on every surface in both themes, and rethemeing means redoing that audit, not swapping a constant |
 
 ### Roles on the phone (Stage 16)
 
@@ -479,6 +481,12 @@ than trusting the note.
 
 ---
 
-*Updated 2026-09-10 from the live codebase — `hrms/` and `mobile/` both read directly
+*Updated 2026-09-12 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
+
+*Last verified 2026-09-12: `php artisan test` 1235 passed (2924 assertions),
+`flutter analyze` clean, `flutter test` 198 passed, and `flutter build appbundle`
+produces a 44.1 MB release bundle whose merged manifest reads minSdk 24 /
+targetSdk 36 and whose compiled `ic_launcher.xml` still carries the
+`<monochrome>` layer. Stages 19 and 20 were found and done in that pass.*

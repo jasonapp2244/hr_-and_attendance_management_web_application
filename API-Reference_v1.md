@@ -1,4 +1,4 @@
-# Employment Management Portal — Mobile API Reference (v1)
+# KEMP — Mobile API Reference (v1)
 
 **Base URL:** `https://<host>/api/v1`
 **Auth:** Laravel Sanctum personal access tokens (`Authorization: Bearer <token>`)
@@ -151,7 +151,7 @@ No token required. Use it to check reachability and confirm the API version
 before showing a login screen.
 
 ```json
-{ "ok": true, "service": "Employment Management Portal", "version": "v1", "time": "2026-07-30T19:13:39+00:00" }
+{ "ok": true, "service": "KEMP", "version": "v1", "time": "2026-07-30T19:13:39+00:00" }
 ```
 
 ### `GET /app/status`

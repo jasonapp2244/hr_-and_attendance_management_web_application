@@ -1,4 +1,9 @@
-# Klutch Cleaning — Employment Management Portal (EMP)
+# KEMP — Klutch Employment Management Program
+
+*Known internally as the Employment Management Portal (EMP) until the rebrand,
+which is why `emp` is still the database name, the `emp:` artisan prefix and the
+deployment subdomain. Those are identifiers, not the product name, and renaming
+them would buy nothing and break every runbook.*
 
 Working notes. Laravel 12 + MySQL web dashboard in `hrms/`, Flutter client in
 `mobile/`, both on the same API. This file is for whoever picks the project up
@@ -704,15 +709,17 @@ of a `Row` inside one. Text beside an icon needs `Flexible`.
   match `headings` exactly or the exports throw.
 - **The API-docs test walks the route table.** A new endpoint fails the suite
   until it is written up in `API-Reference_v1.md`. That is deliberate.
-- **`APP_NAME` is the long string in the title above**, and it lives in `.env`,
-  which is gitignored. Only `hrms/.env.production.example` carries it in the
-  repository, so an install that skips it reads "Laravel" everywhere. It is also
-  the TOTP issuer: changing it relabels **new** 2FA enrolments only — existing
-  ones keep the old label and keep working, because the shared secret is
-  untouched.
-- **`MAIL_FROM_NAME` must not inherit `${APP_NAME}`.** It used to, which was
-  fine while the name was one short phrase. It now fills the From column of
-  every inbox with the full product title. Set it by hand to `Klutch Cleaning`.
+- **`APP_NAME` is `KEMP`**, and it lives in `.env`, which is gitignored. Only
+  `hrms/.env.production.example` carries it in the repository, so an install
+  that skips it reads "Laravel" everywhere. It is also the TOTP issuer:
+  changing it relabels **new** 2FA enrolments only — existing ones keep the old
+  label and keep working, because the shared secret is untouched. It was
+  `Klutch Cleaning - Employment Management Portal (EMP)` until the KEMP
+  rebrand, so anybody already enrolled still sees that in their authenticator.
+- **`MAIL_FROM_NAME` must not inherit `${APP_NAME}`**, even now that the name is
+  short enough that it could. The From column should say who is writing, and to
+  somebody opening a leave decision on their phone that is their employer, not
+  the software. Set it by hand to `Klutch Cleaning`.
 - **`App\Support\SqlDumper` must stay free of the container.** `SqlDumperTest`
   is a plain `PHPUnit\TestCase` with no application booted, so a `config()` call
   anywhere in that class dies with *Target class [config] does not exist* and
