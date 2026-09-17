@@ -1228,14 +1228,35 @@ deploy on `MAIL_MAILER=log`.
   all warn and say which, since the advisory database is fetched over the wire
   and plenty of boxes have no outbound access.
 
-**Preflight is not green on that box, and the failures are real.** As of the
-first deploy there: the demo quick-login panel is ON at a public URL and
-`admin@hrms.test` still carries the seeded password `password`, which together
-are one click to full admin for anybody who finds the URL; `MAIL_MAILER` is
-`log`; and `TRUSTED_PROXIES` is unset behind Varnish, so every punch records the
-proxy's IP instead of the employee's and neither the audit trail nor the IP
-column in exports is telling the truth. All three are `.env` lines plus a
-`config:cache`.
+**Preflight on that box now reports 24 passed, 3 warnings, 1 failure**, and the
+one failure is not a code change. As of 2026-09-17:
+
+- **`MAIL_MAILER` is `log`** — the only failure left, and blocked on SMTP
+  credentials rather than on anything in this repository. `MAIL_FROM_ADDRESS` is
+  still `hello@example.com` and warns alongside it. Password resets, leave
+  decisions, scheduled reports and document-expiry warnings are all built and
+  tested, and all go nowhere until this is set.
+- Warnings: `APP_ENV=staging` (deliberate — setting it to `production` would
+  switch preflight from advisory to blocking and then fail the deploy on
+  `MAIL_MAILER`), the mail from address, and push disabled until a Firebase
+  project exists.
+
+**All three of the original failures are closed**, and two of them closed
+without anybody doing it in a deploy — the note here had simply outlived them:
+
+- `Demo quick-login` was turned off on 2026-09-17. `Demo credentials` had
+  already started passing on its own: no account carries the seeded password
+  any more, so by the time the panel came down it was publishing addresses that
+  did not work. Both were true before anyone re-read this paragraph.
+- **`TRUSTED_PROXIES` reads `127.0.0.1`** and passes. It had been recorded here
+  as unset; it is set, and after trap 36 it is also actually *read*. Varnish is
+  on the loopback, so `127.0.0.1` is right rather than a placeholder. Passing
+  preflight only proves the key has a value — **prove the effect separately** by
+  making a punch and reading `attendance_logs.ip_address`. That has not been
+  done yet.
+
+Re-read a status paragraph against the box before planning around it. This one
+was wrong in two particulars out of three, in the direction of pessimism.
 
 **`TRUSTED_PROXIES` is only an `.env` line as of 2026-09-15** — before that it
 was an `.env` line plus a bug, and setting it would have changed nothing. See
