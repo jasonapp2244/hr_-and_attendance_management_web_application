@@ -96,6 +96,7 @@ Validation failures — and only validation failures — add per-field detail:
 | `too_many_requests` | 429 | Rate limited. See §2. |
 | `invalid_credentials` | 401 | Login: wrong address or password. |
 | `account_disabled` | 403 | Login: the account has been switched off. |
+| `device_not_trusted` | 403 | Login: the account is bound to a different handset (B1.6). HR releases it. |
 | `duplicate_scan` | 429 | Punch: within the cooldown of the last one. |
 | `no_office` | 422 | Punch: the company has no office set up. |
 | `wrong_password` | 422 | Password change: current password incorrect. |
@@ -288,8 +289,37 @@ employee-scoped endpoint answers `403`.
 A wrong address and a wrong password give the **same** answer — saying which was
 wrong would tell an attacker which addresses exist.
 
+**Every outcome here lands in the security trail** (A1.8), which the web
+dashboard shows under Activity Log: a sign-in, a failed attempt with the address
+that was tried, a correct password on a disabled account, and being rate
+limited. The entry names the door in words — *"Signed in from the mobile app"* —
+because somebody reading it after an incident needs to know whether a handset
+was involved. Signing out is recorded too, and `logout-all` records how many
+tokens and handsets it reached.
+
+#### Device binding (B1.6)
+
+Send `device_id` — a UUID the app generates **once** and keeps in the platform
+keychain, never a hardware identifier — and optionally `platform`. Both are
+ignored unless the company has switched binding on.
+
+| Field | Type | Notes |
+|---|---|---|
+| `device_id` | string, optional, ≤100 | Stable for the life of the install. Generate it on first launch and **do not clear it at sign-out** — it describes the phone, not the person, and a fresh one at each sign-out defeats the feature entirely. |
+| `platform` | string, optional, ≤20 | `android`, `ios`. Display only. |
+
+When binding is on, the **first** handset to sign an account in claims it and is
+let through; a **different** handset is then refused `device_not_trusted` (403)
+and **no token is issued**. HR releases the binding from the web dashboard when
+somebody changes or wipes a phone.
+
+A client that sends no `device_id` is let through rather than refused — that is
+an older build, not an impostor — but it cannot be bound either, so it gets none
+of the protection. The check runs **after** the password, so somebody guessing
+passwords is never told that an account exists *and* is bound.
+
 **Failures:** `invalid_credentials` (401) · `account_disabled` (403) ·
-`validation_failed` (422) · `too_many_requests` (429)
+`device_not_trusted` (403) · `validation_failed` (422) · `too_many_requests` (429)
 
 ### `POST /auth/forgot-password`
 
@@ -372,10 +402,44 @@ stale screen cannot post the wrong one.
 |---|---|---|
 | `latitude` | numeric, optional, −90…90 | Recorded for HR. Never blocks a punch. |
 | `longitude` | numeric, optional, −180…180 | As above. |
+| `location_mocked` | bool, optional | The OS's own word on whether *this fix* came from a mock provider — `Position.isMocked` on Android and iOS. Send it only when sending coordinates. |
+| `device_rooted` | bool, optional | Whether the handset appears rooted or jailbroken. |
+| `device_emulator` | bool, optional | Whether the app is running on an emulator. |
 
 Location is a record, not a gate: office, remote and hybrid staff all clock in
 from wherever they are. If the handset refuses permission, send the punch
 without it.
+
+`GET /attendance/today` carries a `geofence` object when — and **only** when — a
+fence applies to the caller (B2.5):
+
+```json
+"geofence": { "office": "Head Office", "latitude": 40.758, "longitude": -73.9855, "radius": 100 }
+```
+
+`null` is the normal case, and it covers four different situations the client
+must not try to tell apart: the company does not enforce, the employee works
+from home or hybrid, the office has no coordinates, or this build is talking to
+an older server. The server resolves all of that — **do not reimplement it.**
+
+When it is present, a client may check the distance itself and say so instead of
+posting, using **haversine on a spherical earth**, which is what the server runs.
+Match its exemptions exactly, including this one: **a punch that carries no
+coordinates is never refused**, so never block one locally for want of a fix.
+Refusing anything the server would have accepted is worse than not checking at
+all.
+
+**The three integrity flags are recorded and never enforced** (B2.7). Nothing
+here refuses a punch; the attendance register marks the row and offers a filter,
+and a person decides. One flagged punch is usually nothing — a pattern is the
+thing.
+
+**Omit a flag you cannot answer; do not send `false` for it.** The column is
+three-state, and `null` means *the client said nothing*, which is what every
+web-portal punch and every build older than this feature carries. `false` is the
+handset actively reporting a clean device, and defaulting to it would write a
+bill of health nobody issued. The same three fields are accepted per punch on
+`POST /attendance/sync` and on `POST /attendance/break`.
 
 ```json
 {
@@ -521,7 +585,9 @@ Everything a home screen needs.
   "is_clocked_in": true,
   "worked_minutes": 2,
   "punches": [ { "id": 109, "type": "in", "status": "late", "scanned_at": "...", "time": "04:57 PM", "office": "Head Office", "source": "mobile" } ],
-  "shift": { "id": 1, "name": "Morning Shift", "start_time": "09:00:00", "end_time": "17:00:00", "late_grace_minutes": 15, "crosses_midnight": false },
+  "shift": { "id": 1, "name": "Morning Shift", "start_time": "09:00:00", "end_time": "17:00:00",
+             "late_grace_minutes": 15, "crosses_midnight": false,
+             "break_minutes": 30, "break_is_paid": false, "break_is_minimum": false },
   "is_day_off": false,
   "holiday": null,
   "leave": null
@@ -544,8 +610,21 @@ Everything a home screen needs.
   apart from `next_action` because one screen carries both and they move
   independently.
 - `break_started_at` is set only while `on_break` is `true`.
+- The shift's **break policy** (A5.7) travels with it, so a client can tell
+  somebody what pressing the break button costs them: `break_minutes` is the
+  shift's break, `break_is_paid` means it stays on the clock, and
+  `break_is_minimum` means that much comes off however short the break actually
+  taken. `break_is_paid` wins over `break_is_minimum` — a paid break costs
+  nothing, so there is no floor to raise it to. Absent from `/schedule` and the
+  `/team/*` payloads, which answer different questions.
 - `worked_minutes` counts closed in/out pairs, plus the open stretch up to now
-  when `is_clocked_in` is true, **less any completed break**.
+  when `is_clocked_in` is true, **less any completed break** — unless the
+  shift's break is **paid** (A5.7), in which case the break stays on the clock.
+  Nothing else about the break policy reaches a live number: the shift's
+  nominal break has not been taken yet at five past nine, and whether a short
+  break is topped up to the shift's minimum cannot be judged until it is over.
+  Both of those apply to the day's **paid** figure, which is the web dashboard's
+  overtime report rather than anything here.
 - `leave` being set does **not** disable the button. Somebody who books a day
   off and comes in anyway worked, and the record has to say so.
 
@@ -737,6 +816,11 @@ that is how unpaid leave is set up. Do not grey it out or show "0 days left".
 | `is_half_day` | bool, optional | Only for a type allowing it, and only when start and end are the same date. |
 | `half_day_period` | `first_half`\|`second_half`, optional | |
 | `reason` | string, optional, ≤1000 | |
+| `attachment` | file, optional, ≤10 MB | `pdf jpg jpeg png webp doc docx`. **Send the whole request as `multipart/form-data`** — the file is a part, not base64 in a JSON body, and the other fields cross as form fields beside it. |
+
+**The file is stored only if the request is accepted.** A refusal — overlapping
+dates, an exhausted balance — deletes it again rather than leaving a medical
+document on disk belonging to a request that does not exist.
 
 **The server counts the days.** Weekends and company holidays inside the range
 are free, so Friday-to-Monday over a two-day weekend costs **2**, not 4. Do not
@@ -791,6 +875,27 @@ The same fields plus `half_day_period`, `reason`, `manager_note`,
 `decided_at`.
 
 `403` for anybody else's request.
+
+### `GET /leave/requests/{leaveRequest}/attachment`
+
+The supporting file, streamed. **Not JSON** — the body is the file, with
+`Content-Disposition` naming it as it was uploaded. Failures still answer in
+JSON, so decode only on a non-2xx.
+
+**Two readers, and no others:** the employee who attached it, and that person's
+line manager. Not a colleague, and not a manager of a different team — holding
+`approve-leave` gets a manager through the door and grants nothing on its own,
+which is the same rule that governs deciding. HR and administrators read it in
+the web dashboard, through their own session.
+
+Every leave payload carries `has_attachment` (bool) and `attachment_name`
+(string or null) so a client knows whether to offer this at all.
+`has_attachment` is computed from the disk rather than from the column, so a
+row whose file has gone missing reports `false` while still carrying the name —
+do not draw a link from the name alone.
+
+**Failures:** `forbidden` (403) · `not_found` (404, the row exists but the file
+is gone)
 
 ### `POST /leave/requests/{id}/cancel`
 
@@ -946,6 +1051,70 @@ A manager with nobody reporting to them gets `team: []`, not an error.
 
 ---
 
+### `GET /team/leave-calendar`
+
+Who on your team is off, and when — a month at a time. Same gate and same team
+as the two above.
+
+| Query | Default | Notes |
+|---|---|---|
+| `month` | the company's current month | `YYYY-MM`. |
+
+```json
+{
+  "ok": true,
+  "month": "2026-08", "from": "2026-08-01", "to": "2026-08-31",
+  "timezone": "America/New_York", "today": "2026-08-03", "team_size": 6,
+  "days": [
+    { "date": "2026-08-01", "weekend": true, "holiday": null, "people": [] },
+    { "date": "2026-08-03", "weekend": false, "holiday": null,
+      "people": [
+        { "employee_id": 2, "name": "Emily Johnson", "employee_code": "EMP-0002",
+          "leave_type": "Annual", "status": "approved",
+          "is_half_day": false, "half_day_period": null,
+          "start_date": "2026-07-29", "end_date": "2026-08-03" }
+      ] },
+    { "date": "2026-08-31", "weekend": false, "holiday": "Summer Bank Holiday",
+      "people": [] }
+  ]
+}
+```
+
+Returned **date-major** — the opposite of `/team/roster`, and deliberately: this
+answers "can I let a second person go that week", which is a question about a
+day rather than about a person.
+
+**Every day of the month is present**, including weekends, holidays and days
+nobody is off. The client draws a grid, and a grid with holes in it is a grid
+the client has to reconstruct.
+
+**`status` is `approved` or `pending`, and nothing else is returned.** Pending is
+drawn alongside approved on purpose: a month showing only what is already
+granted is a month a manager can approve a second person onto. Rejected and
+cancelled requests are not cover anybody plans around, so they are absent.
+
+**A stretch is expanded into every day it covers**, clipped to the month — but
+`start_date` and `end_date` still name the real request, so a fortnight that
+began in July reads correctly on 1 August.
+
+`today` is the **company's** today, for marking the current cell. The handset is
+in whatever zone its owner is standing in and does not get a vote — see the note
+under `/attendance/history`.
+
+**The manager's own leave is not on it**, and neither is anybody outside their
+direct reports: the team is exactly what the other two team endpoints use.
+
+Unlike `/team/attendance`, a **future month is not refused** — leave is booked
+ahead, so next month is the most useful month this answers for.
+
+A manager with nobody reporting to them gets `team_size: 0` and a full month of
+empty days, not an error.
+
+**Failures:** `forbidden` (403, no `approve-leave` permission) ·
+`validation_failed` (422)
+
+---
+
 ## 8. Schedule
 
 ### `GET /schedule`
@@ -1020,6 +1189,56 @@ Contact details only.
 
 Department, manager, shift, hire date and employee code are HR's to set. Anything
 else posted here is ignored, not obeyed.
+
+### `PUT /profile/details`
+
+Where you live and who to call — the **employee record**, not the account
+(B3.2). A separate route from `PUT /profile` because it is a separate table, and
+an account with no employee row has nothing here to write.
+
+| Field | Type |
+|---|---|
+| `personal_email` | email, optional, ≤150 |
+| `address` | string, optional, ≤500 |
+| `city` | string, optional, ≤100 |
+| `country` | string, optional, ≤100 |
+| `emergency_contact_name` | string, optional, ≤150 |
+| `emergency_contact_phone` | string, optional, ≤30 |
+| `emergency_contact_relation` | string, optional, ≤60 |
+
+**Only the fields actually sent are written.** An omitted key is left alone, so
+a client that knows about six of these cannot wipe the seventh by never having
+heard of it. An **empty string clears** a field — "I no longer have an emergency
+contact" has to be sayable. Values are trimmed, and a field holding only spaces
+is stored as null rather than as an empty field wearing a disguise.
+
+```json
+{
+  "ok": true, "message": "Profile updated.",
+  "employee": {
+    "personal_email": "ann@home.test",
+    "address": "4 Mill Lane", "city": "Leeds", "country": "United Kingdom",
+    "emergency_contact_name": "Sam Lee",
+    "emergency_contact_phone": "555-0199",
+    "emergency_contact_relation": "Brother"
+  }
+}
+```
+
+Date of birth, national id, blood group, hire date, department, manager, shift
+and status are **not** here: they are HR's to set, and an app that let people
+edit them would be a hole in the personnel record rather than a convenience.
+Anything else posted here is ignored, not obeyed.
+
+The **sign-in address is not reachable from here either**, and for a different
+reason: changing it is account takeover in two steps — set it to your own, then
+ask for a password reset — and an unlocked phone would be enough. `personal_email`
+is a contact field and is read by nothing in authentication.
+
+The same seven fields come back on `GET /profile` under `employee`, so a form
+can be prefilled without a second call.
+
+**Failures:** `forbidden` (403, no employee record) · `validation_failed` (422)
 
 ### `PUT /profile/password`
 

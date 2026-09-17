@@ -20,11 +20,11 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1235 tests, ~175s, SQLite in memory
+php artisan test             # 1398 tests, ~270s, SQLite in memory
 
 cd ../mobile
 flutter analyze
-flutter test                 # 198 tests
+flutter test                 # 290 tests
 ```
 
 The app's strings are generated from `mobile/lib/l10n/*.arb` on `flutter pub
@@ -37,13 +37,58 @@ time comes from `Company::tz()`. "Fixing" it to a local zone would shift what
 
 ### Signing in locally
 
-The old `admin@emp.test / password` **no longer exists**. Switch on the demo
-panel instead — it puts one-click role buttons on the login page:
+**A plain `php artisan db:seed` creates no users at all** — `DatabaseSeeder`
+calls `RolePermissionSeeder` and nothing else, deliberately, so that seeding a
+real installation cannot conjure an account with a known password. Accounts come
+from one of two places instead.
+
+**`php artisan emp:install`** — one administrator, on an email and password you
+are prompted for. No employee record, which is intended: see below.
+
+**`php artisan db:seed --class=Database\Seeders\DemoDataSeeder`** — the demo
+company, and seven accounts, **all on the password `password`**:
+
+| Email | Roles | Employee | On the phone |
+|---|---|---|---|
+| `james.smith@acme.test` | employee + manager | EMP-0001 | Everything, **including the Team tab** |
+| `emily.johnson@acme.test` | employee | EMP-0002 | The five employee tabs |
+| `michael.brown@acme.test` | employee | EMP-0003 | The five employee tabs |
+| `jessica.davis@acme.test` | employee | EMP-0004 | The five employee tabs |
+| `david.wilson@acme.test` | employee | EMP-0005 | The five employee tabs |
+| `hr@emp.test` | hr | EMP-0006 | The five employee tabs, **no Team tab** |
+| `admin@emp.test` | admin | *none* | Signs in, then the no-employee-record state |
+
+Four reporting lines run to EMP-0001, which is what makes `is_manager` true for
+that account and nobody else — the app needs the `approve-leave` permission
+**and** a direct report before it draws the Team tab, and these accounts are the
+pair that tells those two apart. **HR holds the permission and leads nobody**,
+on purpose.
+
+**HR got its employee record on 2026-09-16, and had none before that.** The user
+and the role had always been there, so nothing failed — HR simply landed on the
+admin empty state on all four employee screens, and two of the four roles could
+not be shown on a handset at all. `tests/Feature/Api/DemoRoleAccessTest` now
+pins what each role gets, because the only previous way to find this out was to
+sign in and look.
+
+**Admin deliberately has no employee record and must not be given one.** An
+administrator operates the system rather than working for the company. The
+refusal it produces is a designed, tested screen with no retry button on it, and
+a seeder that "fixed" this would hide the one state four screens are built
+around.
+
+The demo panel puts one-click role buttons on the login page:
 
 ```
 DEMO_QUICK_LOGIN=true
-DEMO_QUICK_LOGIN_ACCOUNTS="test.admin@local.test:...,test.hr@local.test:..."
+DEMO_QUICK_LOGIN_ACCOUNTS="james.smith@acme.test:password,hr@emp.test:password"
 ```
+
+**The panel does not create anybody** — it is a list of credentials to fill the
+form with, so every address in it has to exist already. The local `.env`
+currently names `test.admin@local.test` and two siblings that no seeder or
+command in this repository creates; they were made by hand, and on a fresh
+database those buttons fail.
 
 It is forced off when `APP_ENV=production`, and `emp:preflight` fails a deploy
 that still has it on.
@@ -173,6 +218,16 @@ await tester.pumpWidget(app(session));   // memory only from here
 
 Both stores read their file once and hold it, so this is also what a real
 handset does after the first launch.
+
+Where a screen has to load *through* the cache rather than be handed a primed
+one, `test/support/settle.dart` is the only way to let it finish: `runAsync`
+gives the disk real time and `pump` drains the continuations that finish because
+of it, alternating, because a load is a chain of them. Those rounds are real
+wall-clock time, so **the budget is a bet on how busy the machine is** — and
+`flutter test` runs the files concurrently. Three files each carried their own
+copy of the loop at six rounds, which was comfortable alone and intermittently
+short with sixteen files running; the failure reads as a screen that ignored its
+own response, not as a test that did not wait. One copy, twelve rounds.
 
 ### 9. The biometric lock can lock its own owner out
 
@@ -641,6 +696,228 @@ screen to be missing from that file.
 
 A `Wrap` is not enough on its own: it wraps its own children, not the contents
 of a `Row` inside one. Text beside an icon needs `Flexible`.
+
+### 30. The end of a window is only today when nobody asked for less
+
+The app never names a date the server has not named first: it asks for the
+default window, reads `to` out of the reply, and counts from that. Everything
+dated on the History and Roster screens is built that way, because the phone is
+wherever its owner is and attendance is judged in the company's zone.
+
+`to` is the window's end. It is today **only because nothing earlier was
+asked for**. The month grid (B3.4) is the first caller to send both ends, and
+paging back to March gets `to: 2025-03-31` — a true statement about that
+window, and not a statement about today. Anchoring on it moved the app's idea of
+today to the end of whichever month was being read: the forward arrow went dead
+one month back, and switching to the list then asked for thirty days ending
+three weeks before today. Both screens looked internally consistent. Nothing
+errored.
+
+**So the anchor is taken only from a reply to a request that named no `to`.**
+Widening the rule — "read the echo, it comes from the server" — is what broke
+it; the echo is only today's date when the request left `to` alone. A reply to a
+bounded window can be drawn, but it cannot be used to tell the time.
+
+The same applies to `from`: it may never be later than the anchor, because a
+window starting after today comes back empty and reads as a month nobody
+attended. `test/history_calendar_test.dart` runs its mock server in **April
+2025**, nowhere near the machine, so a date built from the handset fails on the
+first expectation instead of passing for eleven months of the year.
+
+**A screen that *offers* a date is covered by this rule too, and two were not.**
+`showDateRangePicker` and `showDatePicker` take `currentDate` — the day they
+draw a ring around — and Material defaults it to `DateTime.now()`. Caught on the
+handset: the phone was on 15 September, the company (America/New_York) on the
+14th, and the Clock, History and Schedule tabs all said the 14th while the leave
+picker ringed the 15th. Somebody booking "from today" books the wrong day, and
+the app visibly disagrees with itself.
+
+On the corrections form it was worse than cosmetic: `lastDate` is a **rule** —
+the server refuses a correction to a time that has not happened — so the picker
+offered a date the app itself would then be refused for. `/leave/balances` and
+`/attendance/regularisations` now carry `today` in the company's zone, and both
+pickers take `currentDate`, `firstDate` and `lastDate` from it. `date('Y')` went
+with them: PHP's `date()` reads the machine clock and ignores
+`Carbon::setTestNow` entirely, so that line could not be made to fail in a test
+no matter what timezone the company was in — an unfreezable clock is its own
+reason not to ask one the time.
+
+### 31. `flutter build apk` can ship a Dart kernel that is weeks old
+
+Two consecutive `flutter build apk --debug` runs produced a **byte-identical**
+APK that did not contain the source in front of them. The build reported
+success in nine seconds, `adb install` reported success, the app launched, and
+the feature simply was not there — which reads as the feature being broken, not
+the build being stale. Deleting `.dart_tool/flutter_build` did **not** clear it.
+Only `flutter clean` did.
+
+So when a change does not appear on the device, **check the artifact before
+debugging the code**:
+
+```bash
+unzip -p build/app/outputs/flutter-apk/app-debug.apk \
+  assets/flutter_assets/kernel_blob.bin | grep -ac "some new string"
+```
+
+Zero means the APK is stale; `flutter clean` and rebuild. It costs about a
+minute, and it is cheaper than the hour spent looking for a bug in code that was
+never running. `uiautomator dump` is the other half of the same check — Flutter
+paints to a canvas, so a screenshot cannot be grepped, but every `tooltip` and
+`Semantics(label:)` lands in the accessibility tree and can be:
+
+```bash
+adb shell uiautomator dump /data/local/tmp/ui.xml
+adb shell cat /data/local/tmp/ui.xml | tr '<' '\n<' | grep -oE 'content-desc="[^"]+"'
+```
+
+### 32. A Flutter package can add permissions you never asked for
+
+`flutter pub add file_picker` (B4.1) put four permissions into the merged
+manifest: `READ_EXTERNAL_STORAGE` and all three `READ_MEDIA_*`. The package
+declares them for the modes that browse media; this app uses
+`FileType.custom`, which is `ACTION_OPEN_DOCUMENT` — the system picker, which
+grants access to the one file the user chose and **needs no permission at all**.
+
+Nothing fails at runtime, which is why this is only ever found at review.
+`READ_MEDIA_IMAGES` and `READ_MEDIA_VIDEO` put an app on Google Play's Photo and
+Video Permissions policy path, wanting a declaration and a justification for
+access the app never exercises — on top of asking every user for more than the
+feature needs.
+
+They are removed explicitly, with `tools:node="remove"` in
+`android/app/src/main/AndroidManifest.xml`, so a future reader sees a decision
+rather than an absence. **After adding any plugin, read what it merged in:**
+
+```bash
+flutter build apk --debug
+grep -oE 'android:name="android\.permission\.[A-Z_]+"' \
+  build/app/intermediates/merged_manifest/debug/processDebugMainManifest/AndroidManifest.xml | sort -u
+```
+
+The list should be the eight in the main manifest and nothing else.
+
+### 33. `useSafeArea: true` does not cover the bottom of a bottom sheet
+
+`showModalBottomSheet(useSafeArea: true)` wraps the sheet in
+`SafeArea(bottom: false)` — deliberately, because a sheet usually has a keyboard
+under it and the caller is expected to handle the bottom with `viewInsets`.
+Every sheet in this app did exactly that and no more, so with the keyboard
+**down** the end of the sheet was drawn underneath the navigation bar.
+
+The end of a sheet is where the submit button lives. On the handset the **Save**
+on *Home & emergency contact* was half-covered by 48dp of opaque black and the
+sheet had nothing left to scroll: the only way to press it was to aim at the top
+half of a button you could not fully see. The leave sheet lost the last line of
+its footnote the same way.
+
+`lib/widgets/sheet_padding.dart` is now the one expression, and the term that
+matters is `padding.bottom` rather than `viewPadding.bottom`: `padding` is
+already the system inset **minus** whatever `viewInsets` covers, so it is the
+navigation bar when the keyboard is down and zero when the keyboard is up over
+it. Adding it to `viewInsets.bottom` is correct in both states and
+double-counts in neither.
+
+### 34. A retry button is a claim that retrying can work
+
+HR and administrator accounts are not employees — `emp:install` creates an
+administrator with no employee row, and HR's work is on the web. Signing one
+into the app is ordinary, and every employee-facing endpoint answers it with
+`403 forbidden`.
+
+All four data tabs rendered that as the ordinary error card, each offering **Try
+again** for a condition that will still be true on the hundredth press. The
+Profile tab already said the true thing and pointed at the web dashboard; the
+rest implied the server was having a moment.
+
+`AsyncView` already hides its button when `onRetry` is null, so the fix was to
+know which failure this is: `ApiErrorText.isMissingEmployeeRecord`, and
+`onRetry: _fatal ? null : _load` on the seven screens that can hit it. The flag
+is cleared at the top of every `_load`, because a screen that dropped its retry
+for good after one refusal would strand a user who later has no signal — which
+`test/no_employee_record_test.dart` asserts in both directions.
+
+### 35. A launcher shortcut outlives the app that wrote it
+
+Everything else this app writes dies with the process or lives in a store it
+controls. A quick action (B2.8) does neither: `setShortcutItems` hands the OS a
+`type` string, the **launcher keeps it**, and it is handed back verbatim on a
+tap — days later, after a reinstall's worth of upgrades, from whichever build
+last published it.
+
+Three consequences, and none of them shows up in a test that only runs one
+build:
+
+- **The type can never be a translated label.** Publishing `t.punchCheckIn` as
+  the type puts `Fichar entrada` on a Spanish launcher, and `QuickAction.parse`
+  has never heard of it. `wireValue` is the identifier and `title` is the
+  words — trap 18 again, in the one place where the two live in different
+  processes.
+- **`parse` must tolerate a string this build does not know.** A downgrade, or
+  a renamed enum row, hands back a type from the future or the past. Null, and
+  the app opens normally.
+- **It must be withdrawn on sign-out.** It is in `_clearToken` beside the punch
+  queue and the cache, for the same reason they are: on a shared work handset a
+  *Check out* left on the menu by the last person is one tap from clocking out
+  the next one, and unlike anything on screen it is reachable **without opening
+  the app at all**.
+
+The tap is also held rather than dropped while `/attendance/today` is in
+flight. Launching *from* the shortcut is the normal case, so the tap always
+arrives before there is a day to punch against; clearing it there leaves the
+feature working only when the app was already open. `_load`'s `finally` asks
+again once the day has settled, and the tap is spent either way at that point —
+one that survived into the next refresh would punch twice for one press.
+
+The punch itself goes through the screen's own `_punch()`, so the fence, the
+fix, the cooldown and the offline queue are not reimplemented behind it.
+
+### 36. `env()` in `bootstrap/app.php` is read before .env exists
+
+`TRUSTED_PROXIES` was configured in the `withMiddleware` closure:
+
+```php
+if ($proxies = env('TRUSTED_PROXIES')) { $middleware->trustProxies(at: …); }
+```
+
+**That guard was never once true**, on any box, in any environment, for the
+whole life of the file. `withMiddleware` registers its callback on
+`afterResolving(HttpKernel::class)`, and `Application::handleRequest` resolves
+the kernel on the line *before* it calls `$kernel->handle()` — and `handle()` is
+what runs `LoadEnvironmentVariables`. So the closure runs before .env has been
+read and `env()` answers null. Verified rather than reasoned about: an
+`afterResolving` hook registered alongside it reports `env('DB_DATABASE')` as
+null too, on a build with no cached config at all.
+
+This is **not** the familiar "don't call `env()` outside config files once you
+run `config:cache`" rule. That one at least works until the first cache. This
+fails always, and silently, because the value is optional by construction: a
+null proxy list is indistinguishable from "no proxy in front of this box".
+
+The consequences were all quiet. Behind Varnish, `$request->ip()` is the
+proxy — so every punch filed the proxy's address (`Api\AttendanceController`),
+the IP column in exports was a column of one repeated value, and the **login
+rate limiter keyed on that address**, which turns A1.10's "one person's mistakes
+cannot lock out a colleague" into its exact opposite: five wrong passwords
+anywhere in the company, and the whole company is locked out.
+
+It now lives in `config/trustedproxy.php`, read by the framework's own
+`TrustProxies` at request time through its documented
+`config('trustedproxy.proxies')` fallback — which means config is loaded by the
+time it is read, and a config file is the only place `env()` survives
+`config:cache`. `emp:preflight` reads the same config key rather than `env()`,
+for the same reason: after a deploy has cached the config, an `env()` check
+would report "unset" on the box that had just set it correctly.
+
+`tests/Feature/TrustedProxyTest` drives the real punch endpoint through the real
+global middleware stack. **Four of its five tests would have passed against the
+broken build** — they set the config key directly, and the framework's fallback
+has always worked. Only `test_the_env_variable_reaches_the_key_the_framework_reads`
+covers the actual fix, which is why it exists and why removing
+`config/trustedproxy.php` fails that one and nothing else.
+
+**The lesson worth carrying:** a setting whose absence is legal cannot be
+verified by reading the code that consumes it. Somebody has to set it and watch
+the effect. Nobody had.
 ---
 ## Conventions
 
@@ -836,7 +1113,10 @@ demote an existing administrator either.
 ## Where things stand
 
 The web dashboard is **complete except for four deliberate omissions**. The
-mobile app and the API are done. `Feature-List_Web-and-App.md` is the live status
+mobile app and the API are done — B2.8, the launcher quick action, was the last
+buildable row on either half, and since it landed **every remaining ⬜ on the
+board is parked by decision rather than outstanding**.
+`Feature-List_Web-and-App.md` is the live status
 board — read it first — and `hrms/config/roadmap.php` drives the phase panel on
 the Settings screen.
 
@@ -845,15 +1125,58 @@ the Settings screen.
 - **AI assistant** (Part D) — out of scope, parked.
 - **Multi-company tenancy** (A2.10) — the schema is company-scoped throughout, so
   this is a routing and onboarding job rather than a data-model one.
+
+  **That sentence is now tested rather than asserted.** It had been the premise
+  the whole feature rests on and had never been checked.
+  `tests/Feature/CrossCompanyIsolationTest` stands up two companies — each with
+  an administrator, a manager and a direct report — and attempts **36 real
+  crossings**: as an administrator (reads, edits, deletes), as a manager (team
+  screens and decisions), as an employee (the self-service withdrawals, where
+  the guard is ownership rather than company), over the API, and as a user with
+  no company at all. Plus listings, which must not merely refuse but must not
+  *contain* the other company's rows — and the `team/*` endpoints, which take no
+  id, so what is tested there is an absence rather than a refusal. All hold.
+  Mutation-checked each time it grew: pulling a guard out fails exactly the
+  tests that should. **Add to it when you add a route that takes a bound model**
+  — three different guard idioms are in use (`authorizeCompany`,
+  `authoriseCompany`, a bare `abort_unless`), plus ownership and team checks, so
+  reading the neighbouring controller is not a substitute for a test.
+
+  **What is genuinely left is smaller than the ⬜ suggests** — the full working
+  is in `Multi-Company_Tenancy-Assessment.md`. Two companies can already be
+  created (`emp:install --force`, or `--company-id=N` to attach an admin to an
+  existing one) and administered separately. What remains:
+
+  1. ~~Close the `?? Office::value('company_id')` fallback.~~ **Done
+     2026-09-15.** `companyId()` now lives once, on the base `Controller`, and
+     **fails closed**: a user with no company gets a 403 saying so, not
+     whichever company owns the first office row. The 19 identical copies of the
+     method are gone. **Call `$this->companyId()` — never re-derive it**; the
+     old line answered `200` with another company's dashboard, which is why it
+     was worth closing while `users.company_id` still happened to be set
+     everywhere.
+  2. **A product decision, not an engineering task**: creating a company is
+     CLI-only and there is deliberately no sign-up route — a public "create your
+     company" form on the client's own server would let anyone create tenants on
+     it. CLI-only, invite-only or open sign-up is the client's call, and
+     building the wrong one is worse than building none.
+  3. Spatie's `roles`/`permissions` carry no `company_id`, so all companies share
+     one set. Defensible — the four roles and 19 permissions mean the same thing
+     everywhere — but record it as a decision rather than leaving it a discovery.
 - **Conditional rules engine** (A2.9, A6.6) — the policies are configurable, but
   there is no if-this-then-that builder.
-- **Drag-and-drop roster planner** (A5.8) — the grid planner works; the dragging
-  does not exist.
-- **QR image on the 2FA setup screen** — composer cannot currently resolve a new
-  dependency (an unrelated `league/commonmark` advisory blocks the resolver), so
-  `App\Support\Totp` is hand-rolled and verified against the RFC 6238 vectors.
-  Setup is by typed key, which every authenticator supports. When composer is
-  unblocked, rendering the existing `otpauth://` URI as a QR is the only change.
+**Built since, and this list used to say otherwise:** the **2FA QR image** was
+recorded here as blocked, on the grounds that composer could not resolve a new
+dependency because of a `league/commonmark` advisory. On 2026-09-14 composer
+resolved `bacon/bacon-qr-code` on the first attempt, and upgraded
+`league/commonmark` 2.8.3 → 2.10.1 and `maatwebsite/excel` 3.1.69 → 3.1.70 in
+the same pass; `composer audit` is clean. The setup screen now draws the
+`otpauth://` URI as inline SVG beside the typed key — see A1.7 in
+`Feature-List_Web-and-App.md`. `App\Support\Totp` is still hand-rolled and still
+verified against the RFC 6238 vectors, and does not reference the QR package.
+
+A blocker nobody re-tested outlived the thing blocking it. Re-read any note of
+that shape against the tool before planning around it.
 
 **The API answers in the caller's language** (C1.18). `SetApiLocale` reads
 `Accept-Language` on the API group only, so a web request is untouched. Three
@@ -897,7 +1220,13 @@ deploy on `MAIL_MAILER=log`.
 - `hrms/.env.production.example` — the env template.
 - `php artisan emp:preflight` — gates a deploy. Fails on debug-on,
   `MAIL_MAILER=log`, a localhost or http `APP_URL`, the sync queue, no recent
-  backup, a bad company timezone, the demo panel left on, and seeded passwords.
+  backup, a bad company timezone, the demo panel left on, seeded passwords, and
+  **a critical or high dependency advisory** (`composer audit`, run inside the
+  command). Medium and low advisories warn instead — blocking an urgent fix on a
+  low-severity advisory in a dev-only tool is how a check gets ignored. It never
+  fails because it *could not* look: composer missing, no network or a timeout
+  all warn and say which, since the advisory database is fetched over the wire
+  and plenty of boxes have no outbound access.
 
 **Preflight is not green on that box, and the failures are real.** As of the
 first deploy there: the demo quick-login panel is ON at a public URL and
@@ -907,6 +1236,15 @@ are one click to full admin for anybody who finds the URL; `MAIL_MAILER` is
 proxy's IP instead of the employee's and neither the audit trail nor the IP
 column in exports is telling the truth. All three are `.env` lines plus a
 `config:cache`.
+
+**`TRUSTED_PROXIES` is only an `.env` line as of 2026-09-15** — before that it
+was an `.env` line plus a bug, and setting it would have changed nothing. See
+trap 36: the value was read in `bootstrap/app.php`, which runs before .env is
+loaded, so it had never once been true. It now lives in
+`config/trustedproxy.php`, which is where the framework's own middleware looks
+and the only place `env()` survives `config:cache`. Whoever sets it on that box
+should confirm the effect rather than assume it: make a punch and read
+`attendance_logs.ip_address`.
 
 **`db:backup --verify` cannot verify on this host.** The panel's database user
 cannot `CREATE DATABASE`, so the scratch restore is skipped with a warning and

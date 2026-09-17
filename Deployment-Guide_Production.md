@@ -208,7 +208,13 @@ break the install silently rather than loudly:
   the employee is never told. Nothing errors.
 - **`TRUSTED_PROXIES=127.0.0.1`** — without it, nginx is the only address PHP
   sees, so every punch records the proxy's IP instead of the employee's and the
-  per-punch IP capture becomes a column of `127.0.0.1`.
+  per-punch IP capture becomes a column of `127.0.0.1`. It also keys the login
+  rate limiter, so untrusted the whole company shares one bucket and five wrong
+  passwords anywhere locks everybody out. Read from `config/trustedproxy.php`;
+  **before 2026-09-15 it was read in `bootstrap/app.php`, which runs before
+  .env is loaded, so setting it had no effect at all.** If this box was
+  configured before that date, do not assume it took — make a punch and read
+  `attendance_logs.ip_address`.
 - **`APP_URL`** — decides the scheme of every generated link, and is the URL
   both app stores will check for the privacy policy.
 
@@ -367,8 +373,17 @@ sudo -u www-data php artisan emp:preflight
 settings, proxy trust, database and pending migrations, writable paths, mail,
 whether anything is draining the queue, whether the scheduler has produced a
 recent backup, the backup path and binaries, push coherence, company timezones,
-the mobile app gate, and whether any admin or HR account still uses the seeded
-password `password`.
+the mobile app gate, whether any admin or HR account still uses the seeded
+password `password`, and **known security advisories against the installed
+packages**.
+
+That last one runs `composer audit` inside the command. A **critical or high**
+advisory fails the deploy; medium and low warn. It never fails because it could
+not look — the advisory database is fetched over the network, and on a box with
+no outbound access (or no composer on `PATH`) it warns and says which, rather
+than turning "I could not check" into "you may not deploy". If you see that
+warning on the live box, run `composer audit` somewhere with a network and read
+the result before shipping.
 
 It exits non-zero on a failure, which is why `deploy.sh` runs it last.
 

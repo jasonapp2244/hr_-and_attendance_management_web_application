@@ -99,10 +99,10 @@
       platform, front-end assets, network services and licences. Compiled by direct inspection of the codebase, not from
       documentation.</p>
     <div class="meta-row">
-      <span class="meta">131 software packages</span>
+      <span class="meta">133 software packages</span>
       <span class="meta">1 live network dependency</span>
       <span class="meta">0 paid services in use</span>
-      <span class="meta">Verified 29 Jul 2026 · revised 6 Aug 2026</span>
+      <span class="meta">Verified 29 Jul 2026 · revised 6 Aug, 14 &amp; 15 Sep 2026</span>
     </div>
   </div>
 </header>
@@ -139,14 +139,14 @@
     design template, covered in §12.3.</p>
 
   <div class="stats">
-    <div class="stat"><div class="n">7</div><div class="l">Libraries chosen directly</div></div>
-    <div class="stat"><div class="n">131</div><div class="l">Packages installed in total</div></div>
+    <div class="stat"><div class="n">8</div><div class="l">Libraries chosen directly</div></div>
+    <div class="stat"><div class="n">133</div><div class="l">Packages installed in total</div></div>
     <div class="stat"><div class="n">1</div><div class="l">Live external call</div></div>
     <div class="stat"><div class="n">$0</div><div class="l">Recurring licence cost</div></div>
   </div>
 
-  <p>The 131 figure sounds large and always alarms non-technical readers, so it is worth explaining once: the team chose
-    <b>7</b> libraries. Those 7 libraries each depend on others, which depend on others again. All 131 arrive
+  <p>The 133 figure sounds large and always alarms non-technical readers, so it is worth explaining once: the team chose
+    <b>8</b> libraries. Those 8 libraries each depend on others, which depend on others again. All 133 arrive
     automatically from a single command and are pinned to exact versions in a lock file, so every environment installs
     an identical set. This is normal and is how every modern PHP, Java, .NET or JavaScript project works.</p>
 
@@ -227,8 +227,8 @@
 <!-- ============ 4 ============ -->
 <section id="s4">
   <h2><span class="num">4</span> Backend libraries — chosen directly</h2>
-  <p class="lead">The six libraries the development team deliberately selected. Every other package in the system is
-    present because one of these six required it.</p>
+  <p class="lead">The eight libraries the development team deliberately selected. Every other package in the system is
+    present because one of these eight required it.</p>
 
   <div class="tbl-wrap">
   <table>
@@ -241,8 +241,22 @@
       </tr>
       <tr>
         <td><code>spatie/laravel-permission</code></td><td>6.25.0</td>
-        <td>Roles and permissions. Drives the Admin / HR / Employee separation and all 16 permission checks.</td>
+        <td>Roles and permissions. Drives the Admin / HR / Manager / Employee separation and all 19 permission checks.</td>
         <td>MIT</td><td><span class="badge b-done">Essential</span></td>
+      </tr>
+      <tr>
+        <td><code>laravel/sanctum</code></td><td>4.3.3</td>
+        <td>Issues and revokes the tokens the mobile app signs in with. One token per handset, so a lost
+          phone can be cut off without signing the person out everywhere.
+          <b>Listed in earlier editions of this register as "not yet installed"</b> — see §11.</td>
+        <td>MIT</td><td><span class="badge b-done">Essential</span></td>
+      </tr>
+      <tr>
+        <td><code>google/auth</code></td><td>1.53.0</td>
+        <td>Signs the service-account requests that deliver push notifications through Firebase Cloud
+          Messaging. Used by <code>App\Services\Push\FcmClient</code> and by nothing else. Inert until a
+          Firebase project exists — the app builds and runs without one.</td>
+        <td>Apache-2.0</td><td><span class="badge b-done">In use</span></td>
       </tr>
       <tr>
         <td><code>barryvdh/laravel-dompdf</code></td><td>3.1.2</td>
@@ -250,9 +264,26 @@
         <td>MIT (wraps LGPL — see §12)</td><td><span class="badge b-done">In use</span></td>
       </tr>
       <tr>
-        <td><code>maatwebsite/excel</code></td><td>3.1.69</td>
-        <td>Generates Excel exports and reads the employee bulk-import spreadsheet.</td>
+        <td><code>maatwebsite/excel</code></td><td>3.1.70</td>
+        <td>Generates Excel exports and reads the employee bulk-import spreadsheet.
+          Held at <b>3.1.70 or later, deliberately</b>: 3.1.69 and earlier wrote exports
+          outside the configured filesystem disk when handed a caller-controlled filename
+          (CVE-2026-84374, high), and this application was building export filenames out of
+          the requested report dates. Both ends are fixed — the library is current and the
+          dates are validated before they reach a filename.</td>
         <td>MIT</td><td><span class="badge b-done">In use</span></td>
+      </tr>
+      <tr>
+        <td><code>bacon/bacon-qr-code</code></td><td>3.1.1</td>
+        <td>Draws the <code>otpauth://</code> URI as a QR on the two-factor setup screen, so an
+          administrator can scan rather than type a 32-character key. SVG output, so it needs no
+          <code>ext-gd</code>.
+          <b>Previously removed and re-added on purpose.</b> It arrived in an earlier edition as a
+          transitive dependency of <code>endroid/qr-code</code>, a leftover from the withdrawn QR
+          kiosk design, and both were deleted on 6 August 2026 as dead weight. This is a direct
+          dependency serving a feature that is actually used — which is the same rule that removed
+          it, applied the other way round.</td>
+        <td>BSD-2-Clause</td><td><span class="badge b-done">In use</span></td>
       </tr>
       <tr>
         <td><code>laravel/tinker</code></td><td>2.11.1</td>
@@ -264,19 +295,26 @@
   </div>
 
   <div class="note ok">
-    <b>Seven, not eight.</b> The dependency file lists eight entries but one of them is <code>php</code> itself,
-    which is a version constraint rather than a library. The genuine count of chosen libraries is seven, and every
-    one of them is now in use — <code>endroid/qr-code</code>, listed here in earlier editions as dead weight,
-    <b>was removed on 6 August 2026</b>, taking its own dependency <code>bacon/bacon-qr-code</code> with it. It was
-    a leftover from the QR kiosk design, withdrawn in favour of one-tap GPS check-in. Finding 13.1 is closed.
+    <b>Eight, not nine.</b> The dependency file lists nine entries but one of them is <code>php</code> itself,
+    which is a version constraint rather than a library. The genuine count of chosen libraries is eight, and every
+    one of them is in use.
+    <br><br>
+    <b>On <code>bacon/bacon-qr-code</code>, which this register previously recorded as removed.</b>
+    It arrived originally as a transitive dependency of <code>endroid/qr-code</code>, a leftover from the
+    QR kiosk design that was withdrawn in favour of one-tap GPS check-in, and both were deleted on
+    <b>6 August 2026</b> as dead weight. On <b>14 September 2026</b> it came back as a <i>direct</i>
+    dependency, drawing the two-factor setup screen's <code>otpauth://</code> URI as a QR so an
+    administrator can scan rather than type a 32-character key. That is not a reversal of the earlier
+    decision but the same rule the other way round: the first copy went because nothing used it, and this
+    one is here because something does. Finding 13.1 stays closed.
   </div>
 </section>
 
 <!-- ============ 5 ============ -->
 <section id="s5">
   <h2><span class="num">5</span> Backend libraries — arriving indirectly</h2>
-  <p class="lead">The remaining 89 production packages. Nobody selected these individually; they are requirements of the
-    six libraries above. Listed here by family so the register is genuinely complete.</p>
+  <p class="lead">The remaining 90 production packages. Nobody selected these individually; they are requirements of the
+    eight libraries above. Listed here by family so the register is genuinely complete.</p>
 
   <div class="cards">
     <div class="card">
@@ -344,7 +382,7 @@
   </div>
 
   <div class="note">
-    <b>Version control.</b> Exact versions of all 131 packages are recorded in <code>composer.lock</code>, which is
+    <b>Version control.</b> Exact versions of all 133 packages are recorded in <code>composer.lock</code>, which is
     committed to the repository. A deployment six months from now installs precisely the versions tested today — an
     upstream release cannot silently alter behaviour on the live system.
   </div>
@@ -557,15 +595,24 @@
       <tr><td>SMS or WhatsApp alerts</td><td>Twilio, or a Meta Business Solution Provider</td><td>Per message</td><td><span class="badge b-med">Medium</span> — WhatsApp needs approval</td></tr>
       <tr><td>Fingerprint terminals</td><td>Device manufacturer SDK</td><td>Hardware purchase</td><td><span class="badge b-high">High</span> — ties us to one vendor</td></tr>
       <tr><td>Single sign-on</td><td>Microsoft Entra ID or Google Workspace</td><td>Usually already owned</td><td><span class="badge b-low">Low</span></td></tr>
-      <tr><td>Mobile API access</td><td><code>laravel/sanctum</code> (free library, not a service)</td><td>Free</td><td><span class="badge b-done">None</span></td></tr>
+      <tr><td>Mobile API access <span class="badge b-done">Done</span></td><td><code>laravel/sanctum</code> (free library, not a service) — <b>installed and in use</b>, see §4</td><td>Free</td><td><span class="badge b-done">None</span></td></tr>
     </tbody>
   </table>
   </div>
 
   <div class="note warn">
-    <b>Not yet installed:</b> <code>laravel/sanctum</code>, the component that issues secure tokens to a mobile app, is
-    absent, and no API route file exists. This is expected — the mobile application has not been started. It is noted
-    because it is the first technical step of that phase, and it costs nothing.
+    <b>Installed and in use since — this note said otherwise for months.</b> Earlier editions of this
+    register recorded <code>laravel/sanctum</code> as absent, with no API route file, "expected, because
+    the mobile application has not been started". All three statements are now wrong:
+    <code>laravel/sanctum</code> 4.3.3 issues the tokens every handset signs in with,
+    <code>routes/api.php</code> carries the versioned API behind <code>/api/v1</code>, and the mobile
+    application is built and store-ready. It was added to the table in §4 on <b>15 September 2026</b>,
+    along with <code>google/auth</code>, which had never been listed at all.
+    <br><br>
+    Neither package was new that day; both had been in <code>composer.json</code> for months. The lesson
+    is about the document rather than the code: <b>a register is only true on the day it is compiled</b>,
+    and this section had been read as current long after it stopped being so. Re-derive §4 from
+    <code>composer.json</code> before sending this anywhere.
   </div>
 </section>
 
@@ -654,9 +701,21 @@
       </tr>
       <tr>
         <td>13.6</td>
-        <td>No automated check exists for security advisories against the 131 installed packages.</td>
-        <td>Add <code>composer audit</code> to the release routine — it is built in and free.</td>
-        <td class="eff">1 hour</td><td><span class="badge b-high">Recommended</span></td>
+        <td>No automated check existed for security advisories against the 133 installed packages.
+          <b>Run by hand for the first time on 14 September 2026, it found three</b> — one of them
+          high: <code>maatwebsite/excel</code> 3.1.69 wrote exports outside the configured filesystem
+          disk when handed a caller-controlled filename (CVE-2026-84374), and this application was
+          building export filenames out of unvalidated report dates. Both ends were fixed that day; the
+          other two were <code>league/commonmark</code>, upgraded 2.8.3 → 2.10.1.</td>
+        <td><b>Closed 15 September 2026.</b> <code>composer audit</code> now runs inside
+          <code>php artisan emp:preflight</code>, which <code>deploy/deploy.sh</code> already treats as
+          the gate — so no release ships past a known advisory without somebody deciding to.
+          <b>Severity decides the verdict</b>: critical and high fail the deploy, medium and low warn,
+          because blocking an urgent fix on a low-severity advisory in a dev-only tool is how a check
+          gets ignored. It <b>never fails on its own inability to run</b> — the advisory database is
+          fetched over the network and plenty of production boxes have none, so composer missing, no
+          network or a timeout all warn and say which. Abandoned packages are named but fail nothing.</td>
+        <td class="eff">Done</td><td><span class="badge b-done">Closed</span></td>
       </tr>
       <tr>
         <td>13.7</td>
