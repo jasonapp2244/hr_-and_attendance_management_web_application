@@ -921,6 +921,25 @@ the effect. Nobody had.
 ---
 ## Conventions
 
+- **A list's page size comes from `$this->perPage()`, never a literal.** There
+  were twenty-four of those literals across twenty-one controllers — twenty-three
+  `paginate(n)` calls plus one `const PER_PAGE` that a grep for a digit did not
+  find — spread across five values with no rule anybody could state for which
+  list got which. It was drift: each list was written on a different day and
+  picked a number that looked right on that screen. `config/pagination.php` now
+  holds them, with the reason beside each, and **the existing numbers were kept
+  rather than flattened to one** — a dense audit table and an employee's own
+  leave list genuinely do not want the same count, and collapsing them would
+  have been a visual change made under cover of a refactor. An unknown list key
+  falls back to the default rather than throwing, so a typo costs a slightly
+  wrong page length instead of a 500 on a screen that was working.
+  **On the API the same call also reads `per_page` off the request**, clamped to
+  `pagination.api.max` — see `ApiController::perPage()`. Clamped rather than
+  validated, on purpose: a list that 422s because a client asked for one row too
+  many fails a person reading their own leave to protect a server that could
+  have answered, and `meta.per_page` reports what was actually used. Each
+  endpoint's default is the size it served *before* the parameter existed, so an
+  app that sends nothing still gets what it always got.
 - **A new message the API can return goes into `lang/en/` *and* `lang/es/`**
   (C1.18). A missing key does not fail — it falls back to English and ships as
   an English sentence inside a Spanish screen — so `ApiLocaleTest` compares the
@@ -1248,12 +1267,16 @@ without anybody doing it in a deploy — the note here had simply outlived them:
   already started passing on its own: no account carries the seeded password
   any more, so by the time the panel came down it was publishing addresses that
   did not work. Both were true before anyone re-read this paragraph.
-- **`TRUSTED_PROXIES` reads `127.0.0.1`** and passes. It had been recorded here
-  as unset; it is set, and after trap 36 it is also actually *read*. Varnish is
-  on the loopback, so `127.0.0.1` is right rather than a placeholder. Passing
-  preflight only proves the key has a value — **prove the effect separately** by
-  making a punch and reading `attendance_logs.ip_address`. That has not been
-  done yet.
+- **`TRUSTED_PROXIES` reads `127.0.0.1`, and the effect is proven rather than
+  assumed.** It had been recorded here as unset; it is set, and after trap 36 it
+  is also actually *read*. Varnish is on the loopback, so `127.0.0.1` is right
+  rather than a placeholder. **Checked on 2026-09-17 by reading
+  `attendance_logs.ip_address` on the live box: it holds a routable client
+  address, not `127.0.0.1`.** That is the whole test — before the config file
+  shipped, a punch behind Varnish could record nothing *but* the loopback, so a
+  public address in that column can only come from `X-Forwarded-For` being read.
+  Passing preflight would not have shown this: preflight only proves the key
+  holds a value.
 
 Re-read a status paragraph against the box before planning around it. This one
 was wrong in two particulars out of three, in the direction of pessimism.

@@ -84,6 +84,40 @@ Validation failures — and only validation failures — add per-field detail:
   "errors": { "end_date": ["The end date field is required."] }
 }
 ```
+### Paging
+
+Every list endpoint answers with a `meta` block, and nothing else about paging
+is implied:
+
+```json
+{ "meta": { "current_page": 1, "last_page": 4, "per_page": 30, "total": 106 } }
+```
+
+`?page=n` selects the page. `?per_page=n` selects its size.
+
+**`per_page` is clamped, never refused.** Below 1, unparseable or absent takes
+the endpoint's default; above the ceiling takes the ceiling. A list that 422s
+because a client asked for one row too many fails a person trying to read their
+own leave in order to protect a server that could have answered. Read
+`meta.per_page` to see what was actually used — a client that asked for 100000
+can see that it got 100, and stop asking.
+
+The ceiling is `100` by default and is the point of the parameter being bounded
+at all: without one, `?per_page=100000` is a way to ask the server to build
+every row it owns into a single document.
+
+| List | Default `per_page` |
+|---|---|
+| `GET /directory` | 30 |
+| `GET /notifications` | 25 |
+| everything else | 15 |
+
+**These defaults are what each endpoint already served** before `per_page`
+existed, so an app that sends nothing receives exactly what it received before.
+Both the defaults and the ceiling are configuration (`config/pagination.php`,
+overridable with `API_PER_PAGE` and `API_PER_PAGE_MAX`), so a deployment can
+change them — do not hard-code the numbers above into a client.
+
 
 ### Error codes
 
