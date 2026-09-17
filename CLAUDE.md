@@ -45,7 +45,7 @@ from one of two places instead.
 **`php artisan emp:install`** — one administrator, on an email and password you
 are prompted for. No employee record, which is intended: see below.
 
-**`php artisan db:seed --class=Database\Seeders\DemoDataSeeder`** — the demo
+**`php artisan db:seed --class='Database\Seeders\DemoDataSeeder'`** — the demo
 company, and seven accounts, **all on the password `password`**:
 
 | Email | Roles | Employee | On the phone |
@@ -77,18 +77,36 @@ refusal it produces is a designed, tested screen with no retry button on it, and
 a seeder that "fixed" this would hide the one state four screens are built
 around.
 
-The demo panel puts one-click role buttons on the login page:
+The demo panel puts one-click sign-in buttons on the login page:
 
 ```
 DEMO_QUICK_LOGIN=true
-DEMO_QUICK_LOGIN_ACCOUNTS="james.smith@acme.test:password,hr@emp.test:password"
+DEMO_QUICK_LOGIN_ACCOUNTS="admin@emp.test:password,hr@emp.test:password,james.smith@acme.test:password,emily.johnson@acme.test:password,michael.brown@acme.test:password,jessica.davis@acme.test:password,david.wilson@acme.test:password"
 ```
 
+**Every account named gets a button**, sorted by role — admin, HR, manager, then
+the employees by name. It showed one per role until 2026-09-17, four at most,
+which was solving a real problem the wrong way round: the env file on the live
+box named two employees and no manager, so the area a client most wants to see
+was unreachable and the one they had already seen appeared twice. Collapsing to
+one per role hid that; the cause was the env file, and the panel could not fix
+it by showing less. The five demo employees differ in what they have *done* —
+leave taken, punches made — not only in the role they hold, so which one you
+land on is the tester's choice, not the panel's. The button leads with the
+person's name for that reason; "Employee" five times over names nobody.
+
 **The panel does not create anybody** — it is a list of credentials to fill the
-form with, so every address in it has to exist already. The local `.env`
-currently names `test.admin@local.test` and two siblings that no seeder or
-command in this repository creates; they were made by hand, and on a fresh
-database those buttons fail.
+form with, so every address in it has to exist already, and every one is checked
+against the stored hash before it is drawn. A row that would not sign in is
+never rendered, which means **a missing button is the panel telling you
+something**: wrong password, deactivated account, or no account at all. The
+local `.env` used to name `test.admin@local.test` and two siblings that no
+seeder in this repository creates; they were made by hand, so on a fresh
+database those buttons silently failed to appear. It now names the seven
+`DemoDataSeeder` accounts, which `db:seed --class='Database\Seeders\DemoDataSeeder'`
+will always create. **Quote that class name** — unquoted, bash eats the
+backslashes and Laravel reports `Class "DatabaseSeedersDemoDataSeeder" does not
+exist`.
 
 It is forced off when `APP_ENV=production`, and `emp:preflight` fails a deploy
 that still has it on.

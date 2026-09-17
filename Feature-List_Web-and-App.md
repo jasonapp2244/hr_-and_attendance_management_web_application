@@ -538,8 +538,12 @@ described B5.4 as still open for a while after the enum row landed.
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
 
-*Last verified 2026-09-15: `php artisan test` 1411 passed (3472 assertions),
-`flutter analyze` clean, `flutter test` 290 passed. B4.6, B3.2, A5.7, A5.8 and
+*Last verified 2026-09-17: `php artisan test` **1420 passed (3498 assertions)**,
+`flutter analyze` clean, `flutter test` 290 passed. The nine new tests are the
+page-size pair — see the note at the end of this file. The app count is
+unchanged because no Dart was touched.*
+
+*2026-09-15: 1411 passed (3472 assertions). B4.6, B3.2, A5.7, A5.8 and
 the 2FA QR were finished across that stretch; the last two screens that still
 built a date from the handset's clock — attendance history and the team roster —
 were fixed; and **the security trail was found to be silent about the entire
@@ -603,3 +607,36 @@ makes the whole class of bug invisible.
 44.1 MB release bundle whose merged manifest reads minSdk 24 / targetSdk 36 and
 whose compiled `ic_launcher.xml` still carries the `<monochrome>` layer. Stages
 19 and 20 were found and done in that pass.*
+
+*2026-09-17, from an audit for hardcoded values rather than from the roadmap:
+**almost nothing was.** Company identity, timezone, currency, weekend days, the
+eight attendance policies, overtime rules, leave types, report columns, the
+app's API base URL, every app string and the app's tab list already came from
+the database, config or the signed-in user. No TODOs, no dummy data, no static
+chart arrays, and not one untranslated `Text()` in the app. Two things did not,
+and both are now closed.
+
+**Page sizes.** Twenty-four literals across twenty-one controllers, five
+different values, no rule anybody could state for which list got which — drift,
+not design. They live in `config/pagination.php` now, reached through
+`perPage()` on the base `Controller` beside `companyId()`. The existing numbers
+were kept rather than flattened: a dense audit table and an employee's own leave
+list do not want the same count, and collapsing them would have been a visual
+change made under cover of a refactor. A grep for `paginate([0-9]` found
+twenty-three; the twenty-fourth was a `const PER_PAGE` and surfaced only because
+`API-Reference_v1.md` documented a `per_page` for an endpoint the change had not
+touched. The documentation caught what the search could not.
+
+**`per_page` was advertised and never accepted.** `pageMeta()` has returned it
+since the API was written, telling every client there was a page size worth
+knowing about while no endpoint read one from the request. It is a real
+parameter now, **clamped rather than validated** — a list that 422s because
+somebody asked for one row too many fails a person reading their own leave in
+order to protect a server that could have answered. Every endpoint's default is
+the size it served before, so an app that sends nothing sees no change.
+
+Nine tests, mutation-checked: dropping the `min()` fails the two clamp tests and
+nothing else. **Verified on the live box after deploying `33fe439`**, which is
+the part worth recording — `?per_page=5` answered 5, `?per_page=100000` answered
+100 rather than an error, and no parameter answered 30, the pre-existing
+default. Not left as a local test result.*
