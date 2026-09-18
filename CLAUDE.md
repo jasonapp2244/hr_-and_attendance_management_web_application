@@ -997,6 +997,50 @@ Three details that are load-bearing rather than tidy:
 louder default. `WARN` is what a check says when it does not know — and the cure
 for not knowing is to go and find out, not to warn at everybody and hope the
 right person reads it.
+
+### 38. An escape hatch covers everything it was not meant to cover
+
+`deploy.sh` ran preflight like this on a staging box:
+
+```sh
+$PHP artisan emp:preflight || echo "    (advisory only on a non-production install)"
+```
+
+The reasoning in the comment above it was sound: `MAIL_MAILER=log` and the
+quick-login panel are *why a demo box exists*, and a script that fails on them
+teaches people to stop running the script. What the line actually did was
+downgrade **every check in the command**. An empty `APP_KEY`, an administrator
+still on the seeded password `password` on a public URL, an unreachable
+database, a critical CVE from `composer audit` — all printed red, and the deploy
+carried on and said "Done".
+
+It also silently defeated the check added one commit earlier: trap 37's whole
+point was that a corrupted audit trail should *refuse* a deploy rather than
+warn, and this flag turned it straight back into a warning.
+
+The fix is not to remove the hatch, which was answering a real problem. It is to
+make it selective, and the test for membership is: **could this state be
+somebody's deliberate choice?** Mail to the log is a choice. A demo panel is a
+choice. Nobody chooses an unencrypted session store, a published admin password,
+a database nothing can reach, a punch filed against the proxy's address, or a
+package with a known hole. Those five are `Preflight::ALWAYS_FATAL` and
+`--non-production` does not touch them; everything else downgrades to a warning
+that still prints, annotated so a reader knows why it is yellow.
+
+**Two things this cost that are worth remembering.**
+
+The command reads the sighting from the cache, the default cache store is the
+database, and the proxy check runs *before* `checkDatabase()`. So on a box with
+MySQL down, preflight died on an uncaught `QueryException` and reported nothing
+at all — on precisely the misconfigured box it exists to diagnose. A preflight
+that can throw is a preflight that checks nothing. The read is wrapped, and
+falls back to the warning rather than to a pass: not being able to look is not
+the same as having looked and found nothing.
+
+And that was found by **running the command**, not by the tests, which were
+green throughout. The same lesson as trap 36 — "somebody has to set it and watch
+the effect" — arriving from the other direction: a check whose own failure mode
+is invisible to the suite that covers it.
 ---
 ## Conventions
 

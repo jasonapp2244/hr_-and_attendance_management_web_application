@@ -544,9 +544,23 @@ means migrating the wrong database. For a genuine staging or demo box, say so:
 sudo ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh
 ```
 
-Preflight is then advisory rather than fatal — `MAIL_MAILER=log` and a demo panel
+Preflight is then **selectively** advisory — `MAIL_MAILER=log` and a demo panel
 are the point on a demo box, and failing on them would only teach people to skip
-the script.
+the script. Five checks are never downgraded, because none of them can be a
+deliberate choice:
+
+| Never advisory | Why |
+|---|---|
+| `APP_KEY` | Sessions and every encrypted value are broken without it. |
+| `Database` | A box that cannot read its own data is an outage, not a staging box. |
+| `Demo credentials` | An administrator still on the seeded `password`, on a URL strangers can reach. |
+| `Dependency advisories` | A critical or high CVE in an installed package. |
+| `TRUSTED_PROXIES` | A proxy is forwarding and is not trusted, so every punch is filing the proxy's address into the audit trail. |
+
+The flag used to cover the whole command, so all five of these printed red and
+the deploy finished anyway. If a staging deploy now stops where it used to pass,
+that is this change and the failure is real — fix the `.env` rather than
+reaching for a way around it.
 
 ---
 
