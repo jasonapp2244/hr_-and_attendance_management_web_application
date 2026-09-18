@@ -835,24 +835,42 @@ navigation bar when the keyboard is down and zero when the keyboard is up over
 it. Adding it to `viewInsets.bottom` is correct in both states and
 double-counts in neither.
 
-### 34. A retry button is a claim that retrying can work
+### 34. A retry button is a claim that retrying can work, and an icon is a claim about why
 
 HR and administrator accounts are not employees — `emp:install` creates an
 administrator with no employee row, and HR's work is on the web. Signing one
-into the app is ordinary, and every employee-facing endpoint answers it with
-`403 forbidden`.
+into the app is ordinary, and every employee-facing endpoint refuses it.
 
-All four data tabs rendered that as the ordinary error card, each offering **Try
+All seven screens rendered that as the ordinary error card, each offering **Try
 again** for a condition that will still be true on the hundredth press. The
 Profile tab already said the true thing and pointed at the web dashboard; the
 rest implied the server was having a moment.
 
-`AsyncView` already hides its button when `onRetry` is null, so the fix was to
-know which failure this is: `ApiErrorText.isMissingEmployeeRecord`, and
-`onRetry: _fatal ? null : _load` on the seven screens that can hit it. The flag
-is cleared at the top of every `_load`, because a screen that dropped its retry
-for good after one refusal would strand a user who later has no signal — which
-`test/no_employee_record_test.dart` asserts in both directions.
+**The refusal needed a name of its own before the app could act on it.** It was
+a bare `abort(403)`, which the handler renders as `forbidden` — and so does an
+employee reaching for somebody else's leave request, and so does one
+withdrawing somebody else's correction. Three unrelated conditions under one
+name is fine for a log and wrong for a client, because the app treats this one
+as permanent and those two as ordinary. Matching on `forbidden` meant a
+mistyped id would have been relabelled "this account has no employee record" —
+untrue — and stripped of the retry that would have cleared it. So
+`App\Exceptions\NoEmployeeRecord`, an arm in `bootstrap/app.php` ahead of the
+generic status-to-code mapping, and `no_employee_record` on the wire.
+
+**Then the words were right and the picture was not.** `AsyncView` drew
+`Icons.cloud_off` on every failure, so an administrator was told the network was
+down, seven times, immediately above a sentence saying it was not — and the
+picture is what gets read first, which is how somebody ends up checking their
+wifi over an account setting. It now takes `permanent`, which owns **both** the
+icon and the retry suppression: one flag, because the two always agreed and
+were stated separately as `onRetry: _fatal ? null : _load` at seven call sites.
+A rule restated seven times is a rule that will be got wrong in one of them.
+
+`_fatal` is cleared at the top of every `_load`, because a screen that dropped
+its retry for good after one refusal would strand a user who later has no
+signal. `test/no_employee_record_test.dart` pins all four claims — the message,
+the missing retry, the icon, and `forbidden` **not** being treated as this — on
+all seven screens.
 
 ### 35. A launcher shortcut outlives the app that wrote it
 
@@ -936,6 +954,49 @@ covers the actual fix, which is why it exists and why removing
 **The lesson worth carrying:** a setting whose absence is legal cannot be
 verified by reading the code that consumes it. Somebody has to set it and watch
 the effect. Nobody had.
+
+### 37. A check that cannot tell a healthy box from a broken one is noise
+
+Trap 36 ends on "a setting whose absence is legal cannot be verified by reading
+the code that consumes it. Somebody has to set it and watch the effect." The
+setting moved to `config/trustedproxy.php` and `emp:preflight` grew a line for
+it — and that line could still only ever report what configuration said:
+
+```php
+$proxies ? self::PASS : self::WARN
+```
+
+**Unset is the correct answer on a single-server install**, which is most of
+them, so the check was yellow on the boxes that were fine. A warning that fires
+where nothing is wrong is a warning people learn to scroll past, and it was the
+only thing standing between a proxied box and an `attendance_logs.ip_address`
+column that agrees with itself on every row. It warned loudest exactly where it
+mattered least.
+
+Configuration could never settle this, because the missing fact is not in the
+configuration: it is whether a proxy is actually in front. **Traffic knows.**
+`DetectUntrustedProxy` watches for a forwarding header — `X-Forwarded-For`,
+`Forwarded`, `X-Forwarded-Proto` or a bare `Via`, since a cache may add only the
+last — arriving while nothing is trusted, and leaves one marker. Preflight reads
+it and fails, quoting the header, the address the proxy claimed and the address
+actually stored, so the line argues its own case instead of asking to be
+believed.
+
+Three details that are load-bearing rather than tidy:
+
+- **The configured path returns before touching the request.** This is global
+  middleware; on a correct box it must cost one cached-config array lookup and
+  nothing else.
+- **`Cache::add`, not `Cache::put`.** One write per TTL rather than one per
+  request, so a busy misconfigured box is not billed for its own diagnosis.
+- **A sighting is ignored the moment proxies are configured.** The marker lives
+  a week; fixing the setting must clear the failure by itself, or the next
+  person is debugging a cache key instead of a deploy.
+
+**The general shape:** when a check has to guess, give it evidence instead of a
+louder default. `WARN` is what a check says when it does not know — and the cure
+for not knowing is to go and find out, not to warn at everybody and hope the
+right person reads it.
 ---
 ## Conventions
 

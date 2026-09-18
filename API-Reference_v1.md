@@ -126,6 +126,7 @@ change them — do not hard-code the numbers above into a client.
 | `validation_failed` | 422 | Input rejected. See `errors` for the fields. |
 | `unauthenticated` | 401 | Missing, malformed or revoked token. |
 | `forbidden` | 403 | Authenticated, but not allowed to do this. |
+| `no_employee_record` | 403 | The account has no employee record, so no attendance, leave, schedule, documents or colleagues either. **Permanent** — an HR or administrator login belongs on the web dashboard, and retrying will never clear it. Distinct from `forbidden` for exactly that reason. |
 | `not_found` | 404 | No such endpoint or record. |
 | `too_many_requests` | 429 | Rate limited. See §2. |
 | `invalid_credentials` | 401 | Login: wrong address or password. |
@@ -492,8 +493,8 @@ bill of health nobody issued. The same three fields are accepted per punch on
 against the shift rostered for that day.
 
 **Failures:** `duplicate_scan` (429, within the cooldown of the last punch) ·
-`outside_geofence` (422) · `no_office` (422) · `forbidden` (403, no employee
-record) · `too_many_requests` (429, the `punch` limiter)
+`outside_geofence` (422) · `no_office` (422) · `no_employee_record` (403) ·
+`too_many_requests` (429, the `punch` limiter)
 
 Treat `duplicate_scan` as success from the user's point of view — the punch they
 wanted is already recorded.
@@ -559,7 +560,7 @@ second row. A queue retries whenever a connection is flaky — precisely when th
 endpoint is in use — and attendance is append-only, so a duplicate could only
 ever be voided, never removed.
 
-**Failures:** `no_office` (422) · `forbidden` (403) · `validation_failed` (422,
+**Failures:** `no_office` (422) · `no_employee_record` (403) · `validation_failed` (422,
 empty or over 50) · `too_many_requests` (429, the `punch` limiter)
 
 ### `POST /attendance/break`
@@ -597,7 +598,7 @@ to work while the total silently did not move. Read `can_break` from
 `/attendance/today` and grey the button instead of letting the tap fail.
 
 **Failures:** `break_not_available` (422, not clocked in) · `duplicate_scan`
-(429) · `no_office` (422) · `forbidden` (403) · `too_many_requests` (429, the
+(429) · `no_office` (422) · `no_employee_record` (403) · `too_many_requests` (429, the
 `punch` limiter)
 
 ### `GET /attendance/today`
@@ -808,7 +809,7 @@ attendance; "cancelling" it afterwards would leave the correction standing with
 nothing on record explaining it, so it is refused on `status`.
 
 **Failures for all three:** `validation_failed` (422, including the three rules
-above) · `forbidden` (403, somebody else's request, or no employee record) ·
+above) · `forbidden` (403, somebody else's request) · `no_employee_record` (403) ·
 `not_found` (404) · `too_many_requests` (429, the `write` limiter)
 
 ---
@@ -928,7 +929,7 @@ Every leave payload carries `has_attachment` (bool) and `attachment_name`
 row whose file has gone missing reports `false` while still carrying the name —
 do not draw a link from the name alone.
 
-**Failures:** `forbidden` (403) · `not_found` (404, the row exists but the file
+**Failures:** `forbidden` (403, somebody else's request) · `no_employee_record` (403) · `not_found` (404, the row exists but the file
 is gone)
 
 ### `POST /leave/requests/{id}/cancel`
@@ -938,7 +939,7 @@ Withdraws it. Approved leave gives its days back; pending leave never spent any.
 Only possible while `can_cancel` is true — pending, or approved and not yet
 started. Leave already under way is HR's to unwind.
 
-**Failures:** `validation_failed` (422, with `errors.status`) · `forbidden` (403)
+**Failures:** `validation_failed` (422, with `errors.status`) · `forbidden` (403, somebody else's request) · `no_employee_record` (403)
 
 ---
 
@@ -1272,7 +1273,7 @@ is a contact field and is read by nothing in authentication.
 The same seven fields come back on `GET /profile` under `employee`, so a form
 can be prefilled without a second call.
 
-**Failures:** `forbidden` (403, no employee record) · `validation_failed` (422)
+**Failures:** `no_employee_record` (403) · `validation_failed` (422)
 
 ### `PUT /profile/password`
 
@@ -1434,7 +1435,7 @@ matter.
 **Failures:** `not_found` (404, no such document **or** somebody else's — the two
 are deliberately indistinguishable) · `file_missing` (404, the row outlived its
 file, which means a database was restored without
-`storage/app/employee-documents/`) · `forbidden` (403, no employee record)
+`storage/app/employee-documents/`) · `no_employee_record` (403)
 
 ### Not here: payslips
 

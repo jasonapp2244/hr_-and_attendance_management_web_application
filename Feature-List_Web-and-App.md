@@ -406,14 +406,15 @@ off by default, cleared with the token, and never the only way in.*
 ### Roles on the phone (Stage 16)
 
 The web separates the four roles properly. The app was written employee-first
-and grew a manager tab, and the seams show in three places.
+and grew a manager tab, and the seams showed in three places. All three are now
+closed — the last of them, the administrator empty state, on 2026-09-18.
 
 | | What the app gives them | Right? |
 |---|---|---|
 | **Employee** | Clock, History, Leave, Schedule, Profile, My documents | ✅ |
 | **Manager** | The above plus Team — approvals, team attendance, published roster, who is off this month | ✅ |
 | **HR** | The employee screens only — **desk-only by decision**, see below | ✅ the behaviour was always right; **the demo data was not, until 2026-09-16.** `hr@emp.test` had a user and a role and no employee record, so on a handset it landed on the admin empty state on all four employee screens — this row said one thing and the seeded account did another, and nothing failed to say so. HR now carries EMP-0006, reporting to nobody. `tests/Feature/Api/DemoRoleAccessTest` pins all four roles |
-| **Admin** | Signs in, then 403s on everything — no employee record | ⚠️ by design, but poorly explained |
+| **Admin** | Signs in, then is told why on every employee screen — no employee record | ✅ **was ⚠️ "by design, but poorly explained", and the explaining is now done.** Each of the seven screens already carried its own sentence and dropped its retry button, which is the half that was right. The half that was not: `AsyncView` drew `Icons.cloud_off` above all of them, so an administrator opening the app was told the network was down, seven times, directly above a sentence saying it was not — the picture and the words disagreed and the picture is what gets read first. `AsyncView` now takes `permanent`, which owns the icon **and** the retry suppression, so the rule lives in one place instead of being restated as `onRetry: _fatal ? null : _load` at seven call sites. Underneath it, the API stopped answering this with the generic `forbidden`: that code also means "that leave request is not yours" and "that correction is not yours", so the app's classifier was relabelling two ordinary, recoverable refusals as a permanent account defect and stripping the retry that would have cleared them. `App\Exceptions\NoEmployeeRecord` gives it `no_employee_record` of its own, and `test/no_employee_record_test.dart` now pins all four claims — message, no retry, right icon, and `forbidden` **not** treated as this — across all seven screens rather than three |
 
 **Fixed:** the Team tab hung off the `approve-leave` permission alone. HR holds
 that permission — it is the second step of the approval chain — and almost never
@@ -457,8 +458,12 @@ of them is a line in `.env` and a `config:cache`:
    nowhere.
 3. **`TRUSTED_PROXIES` is unset behind Varnish**, so `attendance_logs` is
    recording the proxy's address on every punch. The audit trail (C1.10) and the
-   IP column in exports (A7.9) are both quietly wrong, and nothing errors to say
-   so.
+   IP column in exports (A7.9) are both quietly wrong. **It no longer goes
+   unsaid**: `DetectUntrustedProxy` notices a forwarded request arriving while
+   nothing is trusted, and `emp:preflight` turns that sighting into a FAIL that
+   names the header, the address the proxy claimed and the one actually stored.
+   The setting is still the fix, and it is still an `.env` line on the box — but
+   a deploy now refuses rather than passing quietly.
 
 Push (B5) additionally needs the Firebase project, which is console work rather
 than a setting. See `Deployment-Guide_Production.md` and
@@ -470,16 +475,16 @@ than a setting. See `Deployment-Guide_Production.md` and
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 94 | 7 | 4 | 105 |
-| Mobile App (B) | 39 | 3 | 3 | 45 |
+| Web Dashboard (A) | 100 | 4 | 2 | 106 |
+| Mobile App (B) | 45 | 0 | 0 | 45 |
 | Backend / API (C) | 18 | 0 | 0 | 18 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **151** | **10** | **14** | **175** |
+| **Total** | **163** | **4** | **9** | **176** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
-delivered. Four planned rows and nine partial ones remain across Part A, and none
-of them blocks a production deployment. The AI assistant (Part D) is deliberately
-out of scope.
+delivered. Two planned rows and four partial ones remain across Part A, and none
+of them blocks a production deployment. Part B (mobile) has no open row
+left. The AI assistant (Part D) is deliberately out of scope.
 
 **Still open, and worth being explicit about:** multi-company tenancy (A2.10), a
 conditional rules engine (A2.9, A6.6), and roster editing and attendance
