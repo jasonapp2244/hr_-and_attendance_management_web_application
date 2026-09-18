@@ -645,3 +645,132 @@ nothing else. **Verified on the live box after deploying `33fe439`**, which is
 the part worth recording — `?per_page=5` answered 5, `?per_page=100000` answered
 100 rather than an error, and no parameter answered 30, the pre-existing
 default. Not left as a local test result.*
+
+---
+
+*Run on real hardware, 18 September 2026 — a Samsung SM A075F on Android 16,
+over `adb reverse tcp:8000 tcp:8000` so the handset's own `localhost` reaches
+the development machine down the USB cable. Worth recording because an emulator
+cannot answer the question this did: the punch stored `device_emulator=0`
+alongside `location_mocked=0` and `device_rooted=0`, and a real GPS fix in
+Karachi. Those three flags are the anti-tamper checks, and on an emulator the
+first of them reads `1`.
+
+**No application code was changed.** Every defect found was in the seeded data,
+and four things that looked like bugs were not:
+
+- `/leave/approvals` returned `pending_count: 0` while a request sat at
+  `status=pending`. Correct — it had `manager_approved_at` set and had moved to
+  HR. The naive count is the one that was wrong.
+- Team totals read 6 against 9 direct reports. Correct — three are `inactive`.
+- A punch with no shift rostered came back `late`. Correct — `determineStatus()`
+  falls back to 09:00–17:00 with 15 minutes' grace, and the punch was at 15:09.
+- History showed 8h 10m with no break deducted. Correct, and the most
+  interesting of the four: `actualBreakDeduction()` takes off only a break that
+  was actually punched, because a nominal break deducted at five past nine would
+  show somebody losing an hour to a lunch they have not had. `overtimeFor()`
+  uses `settledBreakDeduction()` instead, which does apply the nominal one to a
+  finished day. Two questions, two numbers, both right.
+
+The full punch sequence — in, out, in, break_start, break_end, out — reported
+21 minutes, which is the two stretches (18m and 4m) less the 1m 26s break. The
+break arithmetic checks out on real data rather than in a fixture.
+
+The seeded roster was stale: every `shift_assignment` was August, so Schedule
+had nothing current. Regenerated for September across all eleven employees,
+with the weekend read from `LeaveService::weekendDays()` rather than a hardcoded
+Saturday and Sunday.
+
+Still blocked, and confirmed on the handset rather than inferred: Firebase never
+initialises (`Failed to load FirebaseOptions from resource`), so push is off.
+The app logs it and carries on instead of crashing, which is the right
+behaviour, but no notification will arrive until a Firebase project exists.*
+
+---
+
+*A5.7 gained a floor, 18 September 2026. The break policy had two settings and
+needed three.
+
+`break_is_minimum` exists so that a token break cannot buy back an hour: without
+it, an employee who punches a one-minute lunch loses one minute while the
+colleague who works straight through loses the full nominal sixty. That is
+backwards, and it is a fifty-nine-minute-a-day hole that anybody would find
+within a week. So the flag should be on.
+
+Turning it on exposed the opposite error. The nominal break was charged to every
+day of any length, so a twenty-three-minute day had an hour taken off it,
+`worked` clamped at zero, and a day that was worked was reported as a day that
+was not. Verified on real punches before the fix: 23 minutes present, 0 paid.
+
+The missing idea is that **a break is a duty of the long day, not of every day**
+— the usual statutory shape is "a break once the shift passes six hours". That
+is now `attendance.break.nominal_after_minutes`, default 360, read through
+`Shift::nominalBreakApplies()`. Below the floor only a break actually punched
+comes off, and the deduction can never exceed the day itself.
+
+**The floor had to be read on both sides, and that is the part worth
+remembering.** `scheduled` and `worked` are subtracted from one another to get
+overtime. Fixing only the worked side would have reported 240 worked against 180
+scheduled for a four-hour shift worked exactly as rostered, and handed out an
+hour of overtime every day — a worse bug than the one being fixed, and one that
+pays out. `Shift::scheduledBreakDeduction()` exists so both sides read the floor
+in the same place.
+
+Fifteen tests, mutation-checked, and the mutations are the evidence: disabling
+the floor everywhere kills seven, ignoring it on the scheduled side alone kills
+exactly two — the two that hold scheduled and worked together — and removing the
+never-exceed-the-day clamp kills exactly one. No test is redundant and none of
+the three failures overlap. The first mutation run was thrown away: it wrote an
+empty file, every test failed for that reason rather than the mutation, and a
+mutation run where everything fails proves nothing.
+
+Known gap: the app's break notice still reads "60 minutes comes off your hours,
+even if you take less", which is now true only above the floor. The API does not
+publish the floor, so the phone cannot say otherwise yet.*
+
+---
+
+*Lateness became a property of the day, 18 September 2026, and the history row
+learned to admit when a day was not one continuous stretch.
+
+A day is one row per punch, which is the right model and is not changing: it is
+the only shape that survives a forgotten check-out, several stretches, a break
+sitting inside one of them, and a regularisation inserting a punch into a day
+already closed. What it does to arithmetic is that `status` is computed per
+punch, so somebody who arrives at 09:34, steps out and comes back twice carries
+three rows stamped `late` for one late morning.
+
+Three places counted those rows. `ReportService` did it twice — the weekly
+rollup and the per-employee stats — and `AttendanceService::monthlySummary` did
+it once and then computed `ontime = presentDays - lateCount`, which for a single
+day with three late punches is `max(0, 1 - 3)`: the clamp hid the subtraction
+rather than preventing it. Present-days beside it had always counted days, so
+two columns under headings promising the same question answered different ones.
+On real punches: 28 present days, 7 late days, reported as 10.
+
+`AttendanceService::lateDayKeys()` is now the single place that decides, keyed
+`employeeId|date` so one collection can carry a company's week. **The first
+punch of the day decides, not any of them** — arriving on time and returning
+from an errand after the grace window is not a late arrival, however the second
+row is stamped.
+
+`total_ins` is gone. It counted punches, every percentage built on it divided a
+day-based numerator by a punch-based denominator, and the department rollup
+could have reported more than 100% on time. Removing it broke twenty-two tests
+in one run, all from one undefined variable — worth recording because the first
+look at that run was a tail that showed a single failure.
+
+Eight tests, mutation-checked, and the mutations found two of them worthless
+before they found anything else: the check-out test put its `out` *after* every
+arrival, where it can never be picked as the first punch, and the out-of-order
+test fetched rows with `orderBy('scanned_at')`, doing in the harness exactly the
+sort the code under test exists to do. Both passed against the broken code. They
+are fixed, and all four mutations now die to the test that claims them.
+
+On the phone, `punches` had been in the payload and in the app's model all
+along, parsed and dropped. A history row shows the **first** entry and the
+**last** exit against a total that sums the stretches, so a day running 15:09 to
+16:42 reads 22m and every part of that is true while the row looks like broken
+arithmetic. It now says how many punches there were, and only above two, because
+a "2 punches" on every ordinary line is noise that teaches people to stop
+reading it.*
