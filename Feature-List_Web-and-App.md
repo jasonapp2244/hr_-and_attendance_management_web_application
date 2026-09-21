@@ -37,7 +37,7 @@
 | A2.6 | General settings page | ✅ |
 | A2.7 | Company holiday calendar | ✅ |
 | A2.8 | Weekend / working-days configuration per office | ✅ editable working week, company-level — the same definition leave charging, absence and the roster all read. A seven-day week is expressible; a zero-day one is refused |
-| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout, directory contact details, and since 2026-09-21 **the default day** — but there is no conditional rule builder. The default day closed the last business rule in the codebase that no client could move: `determineStatus()` fell back to a literal 09:00–17:00 with 15 minutes' grace whenever no shift was rostered, so a company starting at six had its early shift judged against nine o'clock on every unplanned day and could never be recorded as late at all. It is three company settings now — `default_day_start`, `default_day_end`, `default_day_grace_minutes` — beside the eight that were already there, on the Policies screen, **per company rather than per installation**, because on a multi-company box one client's ordinary morning is another's overtime. The defaults are the literals they replaced, so nobody's history is restated. A default day may not run overnight and is refused with a reason if asked to: a rostered night shift carries the date its hours belong to and an unrostered one has nothing to say which day an evening arrival counts against |
+| A2.9 | Attendance & leave policy rules engine | ✅ two halves, and the second landed 2026-09-21. The policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout, directory contact details, and **the default day**, which closed the last business rule in the codebase that no client could move: `determineStatus()` fell back to a literal 09:00–17:00 with 15 minutes' grace whenever no shift was rostered, so a company starting at six had its early shift judged against nine o'clock on every unplanned day and could never be recorded as late at all. Those are three company settings now — `default_day_start`, `default_day_end`, `default_day_grace_minutes` — **per company rather than per installation**, because on a multi-company box one client's ordinary morning is another's overtime; a default day may not run overnight and is refused with a reason if asked to. On top of them sits the **conditional rule builder** at `settings/rules`: *when* somebody clocks in or requests leave, *if* every condition holds, *then* notify a role, the line manager or the employee, and record it on the activity trail. Conditions are ANDed and there is deliberately no OR — an OR needs grouping, grouping needs parentheses, and two rules say the same thing legibly. **A rule never writes to attendance or leave**, only notifies and records: a rule that could change a punch's status would put a second, invisible author on rows payroll and a tribunal both read. The engine runs inside the path that records a punch, so every layer fails soft — a bad rule row, a deleted leave type, a mail server that is down — and the punch is written regardless. The vocabulary lives in one place (`PolicyRule::FIELDS`), so the form that offers a field, the validator that accepts it and the engine that evaluates it cannot drift; anything outside it is refused on save **and** skipped on read. Behind `manage-settings`, beside the policies, with no permission of its own |
 | A2.10 | Multi-company (SaaS tenancy) support | ⬜ **not built — but its foundation is now tested rather than assumed.** `CLAUDE.md` records that "the schema is company-scoped throughout, so this is a routing and onboarding job rather than a data-model one". That claim is what the whole feature rests on, and it had never been verified. It holds, on both counts. **Schema**: 25 business tables carry `company_id`; the 17 that do not are framework tables (cache, jobs, sessions, migrations), `companies` itself, Spatie's role tables, or rows scoped through a user (`notifications`, `push_devices`, `personal_access_tokens`). **Queries**: `tests/Feature/CrossCompanyIsolationTest` stands up two whole companies and, as one company's administrator, attempts 36 real crossings — opening, editing and deleting the other company's employees, departments, designations, offices, shifts, holidays, leave types and announcements; publishing their announcement; deciding their leave; reading their employee's document vault and checklist; three API endpoints including the document download; and seven listings that must not merely refuse but must not *contain* the other company's rows. All refuse. **The suite was mutation-checked rather than trusted for passing first time**: removing the guard from `EmployeeDocumentController` and `DepartmentController` makes exactly the right three tests fail, one of them on a 200 for another company's document list. Three guard idioms are in use across the controllers — `authorizeCompany`, `authoriseCompany` and a bare `abort_unless` — plus ownership checks in self-service and team checks in the manager paths; reading each proves nothing about the next one somebody writes, which is why this is a test and not a review. **The row is mis-labelled and the remaining work is smaller than ⬜ implies** — see `Multi-Company_Tenancy-Assessment.md`, which is the full working. Two companies can already be created (`emp:install --force`, or `--company-id=N` to attach an admin to an existing one), administered separately, and cannot see each other. What is left is **onboarding, one correctness fix, and a product decision**: creating a company is a command-line operation and there is deliberately no sign-up route, because a public "create your company" form on the client's own server would let anybody on the internet create tenants on it. **The correctness fix that had to come first is done**: the `?? Office::value('company_id')` fallback, repeated at 23 call sites, silently handed a user with no company whichever company owns the first office row — harmless on one company, a cross-tenant read on two. `companyId()` now lives once on the base `Controller` and fails closed, the 19 duplicated copies are gone, and three tests cover it, verified by restoring the old behaviour and watching a company-less admin get 200 on the dashboard. Also open, and recorded so it is a decision rather than a discovery: Spatie's `roles`/`permissions` carry no `company_id`, so all companies share one set — defensible, since the four roles and 19 permissions mean the same thing everywhere |
 
 ## A3. Employee Management
@@ -100,7 +100,7 @@
 | A6.3 | Multi-step approval workflow (manager → HR) | ✅ |
 | A6.4 | Leave balance tracking & accrual rules | ✅ per-type: all at once, or a twelfth a month pro-rated from the hire date. The nightly job only ever raises a balance, so an HR adjustment is never undone |
 | A6.5 | Leave history & status management | ✅ |
-| A6.6 | Company leave policy configuration | 🟡 types + holidays + weekend config, and the default day alongside it (see A2.9); no rules engine |
+| A6.6 | Company leave policy configuration | ✅ types + holidays + weekend config, the default day alongside them, and since 2026-09-21 the rule builder — a leave rule can ask about the leave type, the length of the request, the department, and **days of notice**, which is the figure no column holds and the one every short-notice policy is written around. It is negative when leave is booked after it has already started, so `notice days is at most 0` catches backdated sick leave and leaves a fortnight's notice alone. See A2.9 |
 | A6.7 | Team leave calendar / conflict detection | ✅ month grid, weekend- and holiday-aware, filterable by department. Pending is drawn alongside approved so cover is not granted twice onto one day |
 | A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ✅ |
 | A6.9 | Carry-forward & year-end processing | ✅ capped by the type (null uncapped, 0 off); an overdrawn balance starts at zero rather than in debt, and the roll is safe to run twice |
@@ -308,6 +308,40 @@ roster, profile and password, the full leave round-trip — balances, apply, tra
 withdraw — and the manager's tab: an approval inbox and who on the team is in today.
 The manager tab is drawn from the signed-in user's permissions, not hardcoded.*
 
+## B8. HR Mode (in-app, client requirement)
+
+Added 2026-09-22 at the client's request. Until then HR used the app as an
+ordinary member of staff — five tabs, no team — and did their HR work at a desk.
+That remains true of most of it: **only the two things the client asked for are
+here, and the rest of the web dashboard is deliberately still web-only.**
+
+The tab is drawn on the server's say-so. `/auth/me` carries a `can` block —
+`lead_team`, `decide_leave`, `view_employees` — and the app reads the
+conclusion rather than deriving it from permissions. The same rule used to live
+in Dart *and* in the route table, which is how the Team tab came to be shown to
+every HR user with nothing behind it; a third copy for HR would have repeated
+the mistake on a screen that spends leave balance.
+
+| # | Feature | Status |
+|---|---|---|
+| B8.1 | HR leave queue — the final decision, company-wide | ✅ `GET /hr/leave/approvals`. **This is the second step of the chain, not the first.** The manager's inbox (B4.5) passes a request up and spends nothing; this one commits the days. Gated `manage-leave` to look and `approve-leave` as well to decide, which is exactly what `routes/web.php` puts on the register — a line manager holds the second and not the first, so the permission that keeps them out of the register on the web keeps them out of here, and there is one definition of "may decide for the company" rather than two |
+| B8.2 | Approve / reject from the phone | ✅ `POST /hr/leave/{id}/approve` and `/reject`, calling `LeaveService::approve()` and `reject()` — the same methods the web uses, so the balance moves once and in one place. A rejection **requires a reason**, as it does on the web: the employee reads it, and a refusal with no words is the one outcome somebody always comes back to ask about |
+| B8.3 | The balance, before the tap | ✅ every card carries entitlement, taken and remaining for the type being requested, and a **`would_exceed` warning** — the server making the same comparison `approve()` will make. `approve()` re-checks at the moment of granting because days can be spent in between, and that refusal now returns as a sentence the app shows rather than as a validation error shaped like a form post. Finding out after the tap is the web's behaviour |
+| B8.4 | Decisions are never queued offline | ✅ and this is the one place the app deliberately does **not** behave like the clock. A punch taken with no signal is held and synced, because the punch already happened; a decision has not happened until the server says so, and one replayed from a queue would spend the balance twice. It fails with a message and the request stays in the queue for another try |
+| B8.5 | The manager step, shown | ✅ who seconded the request and what they wrote. Both null for an employee who reports to nobody — whose request skips the manager step by design rather than by oversight — and the card **says so** rather than leaving a blank that would read as a request which slipped through |
+| B8.6 | Clash list | ✅ who else in the **department** is already off over the same dates. The department rather than the company, for the reason the manager's list is their team: company-wide would be every approved day off in the business that week, which is true and unreadable |
+| B8.7 | Recently decided | ✅ `GET /hr/leave/decided`, so the phone is not a write-only surface. The question after "what is waiting" is "what did I do with the one yesterday" |
+| B8.8 | Employee register — search and browse | ✅ `GET /hr/employees`, behind `manage-employees`. **Not the directory**, which stays exactly as conservative as it was: B3.8 answers "who else works here" for everybody and withholds date of birth, address, national id, emergency contact and the reporting line. This returns them, because the reader holds the permission the web puts on the same fields — and a manager, who holds `view-team` and not this, is refused even for their own direct report |
+| B8.9 | Employee record, in full | ✅ `GET /hr/employees/{id}` — the stored record, every active leave type with what is left of each, the last 30 days of attendance **counted rather than listed**, and whether the person has a sign-in account at all. That last is the question HR is asked most often about somebody who says the app will not let them in, and the register could not answer it before |
+| B8.10 | Leave history per person | ✅ `GET /hr/employees/{id}/leave`, its own request because a long-serving employee has a long history and paying for it every time somebody opens a record to check a phone number is the wrong trade |
+| B8.11 | Leavers are findable | ✅ the register defaults to active staff and includes leavers on request — the difference from the directory, which only ever lists people who still work here. Most of what HR is asked after somebody leaves is about somebody who left |
+| B8.12 | Read-only, and it says so | ✅ **a decision, not an unfinished screen**, and the note at the bottom of the record says which. Editing one-handed writes an audit trail nobody would check, and the fields most likely to be mistyped — national id, dates — are the ones least likely to be noticed wrong. Onboarding stays at a desk |
+
+**What is still web-only, and deliberately:** employee editing and onboarding,
+reports, announcements, policies and the rule builder, roles, the leave
+register's configuration, and everything under Administration. The client asked
+for leave handling and the employee records; those are what shipped.
+
 *GPS now travels with a punch. It is a record and never a gate: the app asks for
 "while in use" at the first punch, and services off, a refusal, a sensor that
 returns nonsense or no fix inside eight seconds all send the punch without
@@ -475,21 +509,26 @@ than a setting. See `Deployment-Guide_Production.md` and
 
 | Area | Built | Partial | Planned | Total |
 |---|---|---|---|---|
-| Web Dashboard (A) | 100 | 4 | 2 | 106 |
-| Mobile App (B) | 45 | 0 | 0 | 45 |
+| Web Dashboard (A) | 102 | 2 | 2 | 106 |
+| Mobile App (B) | 57 | 0 | 0 | 57 |
 | Backend / API (C) | 18 | 0 | 0 | 18 |
 | AI Assistant (D) | 0 | 0 | 7 | 7 |
-| **Total** | **163** | **4** | **9** | **176** |
+| **Total** | **177** | **2** | **9** | **188** |
 
 **The web dashboard is complete, AI excluded.** Stages 8 through 12 are all
-delivered. Two planned rows and four partial ones remain across Part A, and none
+delivered. Two planned rows and two partial ones remain across Part A, and none
 of them blocks a production deployment. Part B (mobile) has no open row
 left. The AI assistant (Part D) is deliberately out of scope.
 
-**Still open, and worth being explicit about:** multi-company tenancy (A2.10), a
-conditional rules engine (A2.9, A6.6), and roster editing and attendance
-correction by managers (A10.11 — held with `manage-shifts` and
-`manage-attendance` on purpose).
+**The two partial rows left are both waiting on something other than code:**
+A9.2, which is email and waits on SMTP credentials, and A4.17, where absence
+stays derived rather than written — a decision rather than a gap.
+
+**Still open, and worth being explicit about:** multi-company tenancy (A2.10),
+and roster editing and attendance correction by managers (A10.11 — held with
+`manage-shifts` and `manage-attendance` on purpose). **The conditional rules
+engine (A2.9, A6.6) has come off this list**: it was the last row that was
+neither built nor parked by decision, and it shipped on 2026-09-21.
 
 **The 2FA QR (A1.7) is done, and the note that said it was blocked was wrong.**
 It had been recorded as waiting on composer, which supposedly could not resolve
@@ -542,6 +581,50 @@ described B5.4 as still open for a while after the enum row landed.
 *Updated 2026-09-14 from the live codebase — `hrms/` and `mobile/` both read directly
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
+
+*Last verified 2026-09-22, after the HR area: `php artisan test` **1561 passed
+(3838 assertions)**, `flutter analyze` clean, `flutter test` **327 passed**.
+The thirty-three new server tests are `HrLeaveDeskTest` (19) and
+`HrEmployeeRegisterTest` (14); the ten new app tests are `hr_area_test.dart`.
+Both server files lead on the gate rather than on the feature — a line manager
+holds `approve-leave` and must not reach the step that spends the days, and must
+not read an employee record even for their own report.*
+
+*Two things this work walked into, both already written down and both worth
+re-reading before the next change:*
+
+*1. **Trap 1, for the fifth time.** `whereBetween('work_date', …)` in the
+attendance summary returned nothing on SQLite — a `date` cast is stored as a
+midnight timestamp and the string compare drops the last day of every range.
+`AttendanceLog::forDates()` is the fix, and the note above said to assume a
+fifth instance was waiting.*
+
+*2. **A filled button inside a `Row` throws**, because the app theme sets
+`minimumSize: Size.fromHeight(50)` — a width of infinity — and a Row's main axis
+is unbounded, so that becomes a tight infinite width. The manager's approval
+card had already overridden `minimumSize` for this reason, which is why it had
+never surfaced. Caught by a widget test rather than by review.*
+
+*`flutter test` failed once on `locale_test` during a parallel run and passes
+alone and with `-j 1`. That test waits a fixed 100ms inside `runAsync` for a
+disk read, and one more test file in the run was enough to occasionally outlast
+it. Timing, not behaviour — but it is now flaky enough to be worth a real
+condition rather than a sleep.*
+
+*Last verified 2026-09-21, after the rule builder: `php artisan test` **1528
+passed (3708 assertions)**, `flutter analyze` clean, `flutter test` **317
+passed**. The fifty-three new server
+tests are `RuleEngineTest` (25 — what a rule does, including that a bad one
+costs the notification and never the punch or the booking) and
+`PolicyRuleScreenTest` (28 — what may become a rule, which is the half that
+decides whether the engine is ever handed something it cannot read). **The app
+count is unchanged because no Dart was touched**: a rule is evaluated where the
+punch is written, which is the server, and the app has no rules screen — the
+notification it receives is an ordinary one.*
+
+*The cross-company lookup refusal is mutation-checked: replacing the id check in
+`PolicyRuleController::cleanConditions` with `true` fails exactly one test, the
+one that posts another client's department.*
 
 *Last verified 2026-09-21: `php artisan test` **1475 passed (3596 assertions)**,
 `flutter analyze` clean, `flutter test` **317 passed**, `composer audit` clean.

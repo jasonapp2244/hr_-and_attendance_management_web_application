@@ -1502,6 +1502,191 @@ colleague cannot see more than a manager.
 
 ---
 
+---
+
+## 11b. HR (client requirement, 2026-09-22)
+
+**Two permissions, and they are not the manager's.** Everything under `/hr` is
+gated `manage-leave` or `manage-employees`, which is exactly what
+`routes/web.php` puts on the company-wide register and the employee screens. A
+line manager holds `approve-leave` and neither of these, so the permission that
+keeps them out of the register on the web keeps them out of here — there is one
+definition of "may act for the company" rather than two.
+
+**Ask `/auth/me` before drawing anything.** Its `user.can` block says which of
+these areas will answer:
+
+```json
+"can": { "lead_team": false, "decide_leave": true, "view_employees": true }
+```
+
+`decide_leave` is `manage-leave` **and** `approve-leave`; `view_employees` is
+`manage-employees`. Derive neither locally — the app used to work `lead_team`
+out from the permission list and it drifted from the route table.
+
+### `GET /hr/leave/approvals`
+
+Requests waiting on **HR**, soonest first. This is the second step of the chain:
+a request still with its line manager is not here, and one from an employee who
+reports to nobody skips that step and arrives directly.
+
+Paginated (`per_page`, default 20).
+
+```json
+{
+  "ok": true,
+  "pending_count": 1,
+  "pending": [{
+    "id": 7,
+    "employee": "Ann Lee",
+    "employee_id": 3,
+    "employee_code": "EMP-0003",
+    "department": "Ops",
+    "office": "Head Office",
+    "leave_type": "Annual Leave",
+    "start_date": "2026-11-02",
+    "end_date": "2026-11-03",
+    "days": 2,
+    "is_half_day": false,
+    "reason": "Family wedding",
+    "status": "pending",
+    "submitted_at": "2026-10-20T09:14:00+00:00",
+    "has_attachment": false,
+    "attachment_name": null,
+    "manager_approved_by": "Mia Manager",
+    "manager_approved_at": "2026-10-21T08:02:00+00:00",
+    "manager_note": "Cover arranged.",
+    "balance": {
+      "entitled": 20, "used": 4, "available": 16,
+      "capped": true, "would_exceed": false
+    },
+    "clashes": [{ "employee": "Sam Cole", "start_date": "2026-11-02", "end_date": "2026-11-04" }]
+  }],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 1 }
+}
+```
+
+`manager_approved_by` and `manager_note` are **null when the employee has no
+line manager** — that request skipped the manager step by design. Say so on
+screen rather than leaving a blank, which reads as a request that slipped past
+somebody.
+
+`balance.capped` false means the type has no annual cap, and `available` is not
+meaningful — show what was taken instead. `would_exceed` is the server making
+the same comparison the approve call will make, so a refusal can be shown
+*before* the tap rather than after it.
+
+`clashes` is scoped to the employee's **department**, not the company.
+
+### `GET /hr/leave/decided`
+
+The same shape without `balance` and `clashes`, plus `decided_by` and
+`decision_note`, newest first. So the phone is not a write-only surface.
+
+### `POST /hr/leave/{id}/approve`
+
+Grants it and **spends the days**. Optional `decision_note` (≤1000).
+
+The balance is re-checked at the moment of granting, because days can be spent
+between the request being raised and this call. A refusal comes back as:
+
+```json
+{ "ok": false, "error": "leave_decision_refused",
+  "message": "This request is 2 day(s) but Ann has only 1 day(s) of Annual Leave left." }
+```
+
+`leave_decision_refused` (422) also covers a request that has already been
+decided — two people with the app open, one request. The message is the
+server's own words; show it rather than substituting your own, because an
+over-spent balance and an already-decided request need different answers and
+the client cannot tell them apart.
+
+### `POST /hr/leave/{id}/reject`
+
+**`decision_note` is required** (≤1000). The employee reads it.
+
+### `GET /hr/leave/{id}/attachment`
+
+The supporting file, for the person deciding company-wide. Streams the file, or
+`not_found` when the row names one that is no longer on disk.
+
+### `GET /hr/employees`
+
+The employee register. **Not `/directory`** — that one answers "who else works
+here" for every member of staff and deliberately withholds these fields. This is
+behind `manage-employees`.
+
+Query: `q` (name, staff number or email), `department_id`, `office_id`,
+`status` (`active` default, or `inactive`, `terminated`, `all`), `page`,
+`per_page` (default 20).
+
+Leavers are **included on request**, unlike the directory: most of what HR is
+asked about somebody after they go is about somebody who has gone.
+
+```json
+{
+  "ok": true,
+  "people": [{
+    "id": 3, "employee_code": "EMP-0003", "name": "Ann Lee",
+    "first_name": "Ann", "last_name": "Lee",
+    "department": "Ops", "designation": "Technician", "office": "Head Office",
+    "status": "active", "photo_url": null,
+    "email": "ann@acme.test", "phone": "+44 7700 900001"
+  }],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 20, "total": 1 }
+}
+```
+
+### `GET /hr/employees/{id}`
+
+One record in full, plus three things the stored row does not hold: every active
+leave type with what is left of each, the last 30 days of attendance **counted
+rather than listed**, and whether the person can sign in at all.
+
+```json
+{
+  "ok": true,
+  "employee": {
+    "id": 3, "name": "Ann Lee", "employee_code": "EMP-0003", "status": "active",
+    "date_of_birth": "1990-04-02", "gender": "female", "hire_date": "2021-06-01",
+    "work_mode": "office", "personal_email": null,
+    "address": "14 Orchard Lane", "city": "Croydon", "country": "UK",
+    "national_id": "NI-99-88-77", "blood_group": "O+",
+    "emergency_contact": { "name": "Joan Lee", "phone": "+44 7700 900002", "relation": "Mother" },
+    "manager": "Mia Manager", "manager_id": 2, "shift": "Day",
+    "has_login": true, "login_email": "ann@acme.test", "login_active": true
+  },
+  "balances": [{
+    "leave_type": "Annual Leave",
+    "entitled": 20, "carried": 0, "used": 4, "available": 16, "capped": true
+  }],
+  "attendance": {
+    "from": "2026-08-24", "to": "2026-09-22",
+    "days_worked": 21, "late": 2, "early_leave": 0, "on_time": 19
+  }
+}
+```
+
+A leave type the employee has never touched still appears, at its full
+entitlement: "no balance row" and "nothing taken" look identical on a phone and
+only one of them is true.
+
+`has_login` false is the answer to the question HR is asked most often about
+somebody who says the app will not let them in. Accounts are created on the web.
+
+**Read-only.** There is no PUT here, deliberately — editing a record one-handed
+writes an audit trail nobody would check, and the fields most likely to be
+mistyped are the ones least likely to be noticed wrong.
+
+### `GET /hr/employees/{id}/leave`
+
+That person's leave history, newest first, paginated. Its own call because a
+long-serving employee has a long one, and a record opened to check a phone
+number should not pay for it.
+
+An employee on another company's books is `forbidden` on every route above.
+The permission is company-blind; the controller is not.
+
 ## 12. Push devices
 
 Registration only. Nothing is delivered yet — notifications are Phase 5. The app

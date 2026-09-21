@@ -20,11 +20,11 @@ as a background task does not persist, it exits.
 ```bash
 cd hrms
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1398 tests, ~270s, SQLite in memory
+php artisan test             # 1561 tests, ~300s, SQLite in memory
 
 cd ../mobile
 flutter analyze
-flutter test                 # 290 tests
+flutter test                 # 327 tests
 ```
 
 The app's strings are generated from `mobile/lib/l10n/*.arb` on `flutter pub
@@ -117,6 +117,32 @@ that still has it on.
 error page regardless of the URL, and it is a site permission only the user can
 grant. Use the **chrome-devtools MCP** instead (`new_page`), which works against
 localhost first time.
+
+**MySQL does not have to be running to drive the real UI.** Laravel's Dotenv is
+immutable, so a real environment variable beats the `.env` line, and the whole
+app will run against a throwaway SQLite file without editing anything:
+
+```bash
+export DB_CONNECTION=sqlite
+export DB_DATABASE='C:\path\to\a\scratch\smoke.sqlite'   # must already exist
+php artisan migrate --force
+php artisan db:seed --force --class='Database\Seeders\RolePermissionSeeder'
+php artisan db:seed --force --class='Database\Seeders\DemoDataSeeder'
+php artisan serve --port=8123
+```
+
+**Seed the roles first.** `DemoDataSeeder` assigns roles it does not create, so
+on its own it dies on `RoleDoesNotExist: admin`. And **the demo company is
+`America/New_York`**, which is the first thing to check when a punch you expect
+to be late comes back `ontime`: `record()` works in `Company::tz()`, so 09:50
+UTC is 05:50 to the rule that judges it. The five demo employees are not all on
+the nine o'clock shift either — EMP-0003 starts at 13:00 — so read
+`shiftOn($today)` before choosing a time rather than assuming one.
+
+This is worth doing for anything whose behaviour lives in the browser. The rule
+builder is drawn entirely in JavaScript from the vocabulary the controller hands
+it, so PHPUnit can prove the page returns 200 and the row stores correctly and
+still tell you nothing about whether the form works.
 
 ---
 
@@ -1252,13 +1278,90 @@ demote an existing administrator either.
 
 ---
 
+### The HR area in the app (`/api/v1/hr/*`) — added 2026-09-22
+
+At the client's request. Before this, HR used the app as an ordinary member of
+staff — five tabs, no team — and did HR work at a desk. **Most of that is still
+true**: only leave decisions and the employee register moved, and the rest of
+the dashboard is deliberately still web-only.
+
+**The gate is `manage-leave` and `manage-employees`, and neither is a new
+rule.** They are what `routes/web.php` already puts on the company-wide leave
+register and the employee screens. A line manager holds `approve-leave` and
+*neither of these*, so the permission that keeps them out of the register on the
+web keeps them out of the API — rather than a fresh "approve-leave and not a
+manager" condition that would have been a second definition free to drift.
+
+**`Api\LeaveApprovalController` and `Api\HrLeaveController` are two different
+steps and must stay that way.** The first is the manager's: scoped to their own
+reports, and its approve button calls `managerApprove()`, which passes the
+request up and **spends nothing**. The second calls `approve()`, which commits
+the days. If a manager could reach the second they would be granting company
+leave without anybody having decided they may — `HrLeaveDeskTest` asserts both
+sides of that.
+
+**`/auth/me` now carries a `can` block**, and the app reads it instead of
+deriving anything:
+
+```json
+"can": { "lead_team": …, "decide_leave": …, "view_employees": … }
+```
+
+This exists because `leadsATeam` was worked out in Dart *and* enforced in the
+route table, and the two drifted — which is how every HR user came to have a
+permanently empty Team tab. A third copy for HR would have repeated it on a
+screen that spends leave balance. `lead_team` keeps its local fallback so an old
+app against a new server loses nothing; **`decide_leave` has none on purpose** —
+an app that cannot ask whether it may spend balance must not decide that it may.
+
+**Decisions are never queued offline.** A punch taken with no signal is held and
+synced, because the punch already happened and the clock is the record; a
+decision has not happened until the server says so, and one replayed from a
+queue would spend the balance twice. This is the one place the app deliberately
+does not behave like the clock.
+
+**`approve()` speaks in `ValidationException`** because the web posts forms at
+it. `HrLeaveController` catches that and returns `leave_decision_refused` with
+the message, so the app can show words instead of a 500 — and the queue sends
+`balance.would_exceed` up front, which is the same comparison made *before* the
+tap rather than after.
+
+**The register is not the directory.** `/directory` (B3.8) answers "who else
+works here" for everybody and withholds date of birth, address, national id, the
+emergency contact and the reporting line; `/hr/employees` returns them.
+`HrEmployeeRegisterTest` pins both halves — that HR sees the record, and that an
+ordinary employee reading the directory still does not. Add to it before
+widening either.
+
+**Three traps this feature walked into, all already documented above:**
+
+- **Trap 1 again, the fifth time.** `whereBetween('work_date', …)` in the
+  attendance summary returned nothing on SQLite, because a `date` cast is stored
+  as a midnight timestamp and the string compare drops the last day. Use
+  `AttendanceLog::forDates()`. The note said to assume a fifth was waiting.
+- **A filled button inside a `Row` throws.** The app theme sets
+  `minimumSize: Size.fromHeight(50)` on `FilledButton` — a width of *infinity*,
+  which is what makes them full-width in a column. A Row's main axis is
+  unbounded, so that minimum becomes a **tight infinite width** and layout
+  asserts rather than overflowing. Override `minimumSize` on any filled button
+  in a row; the manager's approval card already did, which is why it never
+  showed up before.
+- **`models.dart` exports a `Directory`** (the company one), which shadows
+  `dart:io`'s in any test that imports both. Import it with `show`.
+
+---
+
 ## Where things stand
 
-The web dashboard is **complete except for four deliberate omissions**. The
-mobile app and the API are done — B2.8, the launcher quick action, was the last
-buildable row on either half, and since it landed **every remaining ⬜ on the
-board is parked by decision rather than outstanding**.
-`Feature-List_Web-and-App.md` is the live status
+The web dashboard is **complete except for two deliberate omissions** — the AI
+assistant and multi-company tenancy, both below. It said *four* until
+2026-09-21, and listed three, which is what a count maintained by hand does: the
+conditional rule builder was one of them and has since been built, and the
+fourth had already gone without the number following it. **The web is now
+complete but for the two.** The mobile app and the API are done — B2.8, the
+launcher quick action, was the last buildable row on either half, and since it
+landed **every remaining ⬜ on the board is parked by decision rather than
+outstanding**. `Feature-List_Web-and-App.md` is the live status
 board — read it first — and `hrms/config/roadmap.php` drives the phase panel on
 the Settings screen.
 
@@ -1305,40 +1408,108 @@ the Settings screen.
   3. Spatie's `roles`/`permissions` carry no `company_id`, so all companies share
      one set. Defensible — the four roles and 19 permissions mean the same thing
      everywhere — but record it as a decision rather than leaving it a discovery.
-- **Conditional rules engine** (A2.9, A6.6) — the policies are configurable, but
-  there is no if-this-then-that builder.
 
-  **The policies really are all configurable as of 2026-09-21, which this line
-  had been claiming for a while and was not quite true.** `determineStatus()`
-  fell back to a literal `09:00:00`–`17:00:00` with 15 minutes' grace on any
-  day no shift was rostered for — an unplanned day, or a rostered day off
-  somebody worked anyway. It was the last business rule in the codebase that
-  no client could move, and it is wrong for any company that does not keep
-  office hours: an early shift judged against nine o'clock can never be
-  recorded as late at all, and nothing on any screen would have said why.
+### The conditional rule builder (A2.9, A6.6) — built 2026-09-21
 
-  It is three company settings now — `default_day_start`, `default_day_end`,
-  `default_day_grace_minutes` — living in `Company::POLICY_DEFAULTS` beside the
-  eight that were already there, editable on the Policies screen, and read
-  through `AttendanceService::dayPolicy()`. **Company settings rather than a
-  config key**, deliberately: on a multi-company box one client's ordinary
-  morning is another's overtime, and `config/attendance.php` cannot say that.
-  The defaults are the literals they replaced, so no existing row is restated.
+**This was the last row on the board that was neither built nor parked by
+decision**, and it used to be a bullet in the list above. The two halves are
+worth telling apart: the company *policies* — the working week, the reminder
+windows, the geofence, the default day — are single values that apply to
+everybody, and the *rule builder* is the screen for what a single value cannot
+say. "When anyone in the Croydon depot clocks in more than twenty minutes late,
+tell their manager" is not a setting; it is a row.
 
-  **A default day may not run overnight**, and the form refuses one with a
-  reason. A rostered night shift can, because its roster row carries the date
-  its hours belong to; an unrostered day has no such row, so an evening
-  arrival would be measured against tomorrow morning and every night worker
-  marked early. Stored and quietly wrong is the worse of the two outcomes.
+`settings/rules`, behind `manage-settings` beside the policies, **with no
+permission of its own** — a rule decides who the system speaks to about
+everybody's attendance, which is the decision that screen already makes, and a
+`manage-rules` would have put a second name on the same authority.
 
-  Ten tests on the behaviour and four on the form, mutation-checked: ignoring
-  the company setting fails exactly the four that set one, and letting the
-  default outrank a rostered shift fails exactly the one that forbids it.
-  **Adding a required field to `PolicyController` breaks every fixture that
-  posts that form** — `SecurityPolicyTest` has seven, and the field list in
-  `test_the_policy_form_renders_with_every_field_on_it` is what stops a field
-  being required by the controller and missing from the blade, which locks the
-  whole page. Extend both when you add the next one.
+**The vocabulary lives in `PolicyRule` and nowhere else.** `FIELDS`, `OPERATORS`
+and `ACTIONS` are read by the form that offers a field, by
+`PolicyRuleController` which validates what comes back, and by `RuleEngine`
+which evaluates it. Three things have to agree and only one copy can be right;
+adding a field to that constant adds it to all three. Anything outside it is
+**refused on save and skipped on read** — the second half is the one that
+matters, because a rule naming a leave type deleted last month must not throw
+inside somebody's leave request.
+
+**The engine runs inside the path that records a punch**, so every layer fails
+soft and each rule runs in its own `try`: a bad row, a missing field, an action
+naming nobody, a mail server that is down — the punch is written regardless, and
+one malformed rule does not silence the three good ones after it. The same
+holds on the leave side. `RuleEngineTest` pins both directions.
+
+**A rule notifies and records. It never writes to attendance or leave**, and
+that is a design decision rather than an unfinished one: a rule that could
+change a punch's status or decide a request would put a second, invisible author
+on rows payroll and a tribunal both read, and the person reading the row would
+have no way to tell which of the two wrote it.
+
+**Conditions are ANDed and there is no OR.** An OR needs grouping, grouping
+needs parentheses, and parentheses need a builder nobody can use without
+training. Two rules say the same thing, each legible on its own line.
+
+**The notification carries no link, deliberately.** One rule can address HR, an
+administrator, the line manager and the employee at once; a notification carries
+one destination for all of them, and the screens worth pointing at are
+permission-gated, so most of that audience would tap through to a refusal.
+Without a url `NotificationController::open` lands on the notification list,
+which is the honest answer.
+
+**Two traps for whoever extends it:**
+
+- **The call and the method behind it shipped apart once.** `LeaveService::submit()`
+  called `runLeaveRules()` before that method existed, and every leave request
+  raised on that build died on `Call to undefined method`. No punch test could
+  have caught it, because the punch half was complete. `RuleEngineTest` now
+  opens its leave section with a test that raises a request and asserts nothing
+  about rules at all — the floor, rather than the feature.
+- **`notice_days` is signed.** `diffInDays()` without its third argument is an
+  absolute value, and a rule written to catch leave booked *after* it started
+  would then match a fortnight's notice just as well. It is measured in the
+  company's timezone, because "today" is the client's rather than the server's.
+
+The screen is covered by `PolicyRuleScreenTest`, which is deliberately the
+larger of the two files: what may *become* a rule decides whether the engine is
+ever handed something it cannot read, and every one of those failures is silent
+— a rule that stores fine and never fires looks on the list exactly like a rule
+waiting for somebody to be late.
+
+
+### The default day (A2.9) — built the same day, and a smaller thing
+
+**The policies really are all configurable as of 2026-09-21, which the board
+had been claiming for a while and was not quite true.** `determineStatus()`
+fell back to a literal `09:00:00`–`17:00:00` with 15 minutes' grace on any
+day no shift was rostered for — an unplanned day, or a rostered day off
+somebody worked anyway. It was the last business rule in the codebase that
+no client could move, and it is wrong for any company that does not keep
+office hours: an early shift judged against nine o'clock can never be
+recorded as late at all, and nothing on any screen would have said why.
+
+It is three company settings now — `default_day_start`, `default_day_end`,
+`default_day_grace_minutes` — living in `Company::POLICY_DEFAULTS` beside the
+eight that were already there, editable on the Policies screen, and read
+through `AttendanceService::dayPolicy()`. **Company settings rather than a
+config key**, deliberately: on a multi-company box one client's ordinary
+morning is another's overtime, and `config/attendance.php` cannot say that.
+The defaults are the literals they replaced, so no existing row is restated.
+
+**A default day may not run overnight**, and the form refuses one with a
+reason. A rostered night shift can, because its roster row carries the date
+its hours belong to; an unrostered day has no such row, so an evening
+arrival would be measured against tomorrow morning and every night worker
+marked early. Stored and quietly wrong is the worse of the two outcomes.
+
+Ten tests on the behaviour and four on the form, mutation-checked: ignoring
+the company setting fails exactly the four that set one, and letting the
+default outrank a rostered shift fails exactly the one that forbids it.
+**Adding a required field to `PolicyController` breaks every fixture that
+posts that form** — `SecurityPolicyTest` has seven, and the field list in
+`test_the_policy_form_renders_with_every_field_on_it` is what stops a field
+being required by the controller and missing from the blade, which locks the
+whole page. Extend both when you add the next one.
+
 **Built since, and this list used to say otherwise:** the **2FA QR image** was
 recorded here as blocked, on the grounds that composer could not resolve a new
 dependency because of a `league/commonmark` advisory. On 2026-09-14 composer
