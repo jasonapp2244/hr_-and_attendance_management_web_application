@@ -37,7 +37,7 @@
 | A2.6 | General settings page | ✅ |
 | A2.7 | Company holiday calendar | ✅ |
 | A2.8 | Weekend / working-days configuration per office | ✅ editable working week, company-level — the same definition leave charging, absence and the roster all read. A seven-day week is expressible; a zero-day one is refused |
-| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout, directory contact details — but there is no conditional rule builder |
+| A2.9 | Attendance & leave policy rules engine | 🟡 the policies themselves are configurable — working week, reminder and auto-close windows, geofence, 2FA requirement, idle timeout, directory contact details, and since 2026-09-21 **the default day** — but there is no conditional rule builder. The default day closed the last business rule in the codebase that no client could move: `determineStatus()` fell back to a literal 09:00–17:00 with 15 minutes' grace whenever no shift was rostered, so a company starting at six had its early shift judged against nine o'clock on every unplanned day and could never be recorded as late at all. It is three company settings now — `default_day_start`, `default_day_end`, `default_day_grace_minutes` — beside the eight that were already there, on the Policies screen, **per company rather than per installation**, because on a multi-company box one client's ordinary morning is another's overtime. The defaults are the literals they replaced, so nobody's history is restated. A default day may not run overnight and is refused with a reason if asked to: a rostered night shift carries the date its hours belong to and an unrostered one has nothing to say which day an evening arrival counts against |
 | A2.10 | Multi-company (SaaS tenancy) support | ⬜ **not built — but its foundation is now tested rather than assumed.** `CLAUDE.md` records that "the schema is company-scoped throughout, so this is a routing and onboarding job rather than a data-model one". That claim is what the whole feature rests on, and it had never been verified. It holds, on both counts. **Schema**: 25 business tables carry `company_id`; the 17 that do not are framework tables (cache, jobs, sessions, migrations), `companies` itself, Spatie's role tables, or rows scoped through a user (`notifications`, `push_devices`, `personal_access_tokens`). **Queries**: `tests/Feature/CrossCompanyIsolationTest` stands up two whole companies and, as one company's administrator, attempts 36 real crossings — opening, editing and deleting the other company's employees, departments, designations, offices, shifts, holidays, leave types and announcements; publishing their announcement; deciding their leave; reading their employee's document vault and checklist; three API endpoints including the document download; and seven listings that must not merely refuse but must not *contain* the other company's rows. All refuse. **The suite was mutation-checked rather than trusted for passing first time**: removing the guard from `EmployeeDocumentController` and `DepartmentController` makes exactly the right three tests fail, one of them on a 200 for another company's document list. Three guard idioms are in use across the controllers — `authorizeCompany`, `authoriseCompany` and a bare `abort_unless` — plus ownership checks in self-service and team checks in the manager paths; reading each proves nothing about the next one somebody writes, which is why this is a test and not a review. **The row is mis-labelled and the remaining work is smaller than ⬜ implies** — see `Multi-Company_Tenancy-Assessment.md`, which is the full working. Two companies can already be created (`emp:install --force`, or `--company-id=N` to attach an admin to an existing one), administered separately, and cannot see each other. What is left is **onboarding, one correctness fix, and a product decision**: creating a company is a command-line operation and there is deliberately no sign-up route, because a public "create your company" form on the client's own server would let anybody on the internet create tenants on it. **The correctness fix that had to come first is done**: the `?? Office::value('company_id')` fallback, repeated at 23 call sites, silently handed a user with no company whichever company owns the first office row — harmless on one company, a cross-tenant read on two. `companyId()` now lives once on the base `Controller` and fails closed, the 19 duplicated copies are gone, and three tests cover it, verified by restoring the old behaviour and watching a company-less admin get 200 on the dashboard. Also open, and recorded so it is a decision rather than a discovery: Spatie's `roles`/`permissions` carry no `company_id`, so all companies share one set — defensible, since the four roles and 19 permissions mean the same thing everywhere |
 
 ## A3. Employee Management
@@ -100,7 +100,7 @@
 | A6.3 | Multi-step approval workflow (manager → HR) | ✅ |
 | A6.4 | Leave balance tracking & accrual rules | ✅ per-type: all at once, or a twelfth a month pro-rated from the hire date. The nightly job only ever raises a balance, so an HR adjustment is never undone |
 | A6.5 | Leave history & status management | ✅ |
-| A6.6 | Company leave policy configuration | 🟡 types + holidays + weekend config; no rules engine |
+| A6.6 | Company leave policy configuration | 🟡 types + holidays + weekend config, and the default day alongside it (see A2.9); no rules engine |
 | A6.7 | Team leave calendar / conflict detection | ✅ month grid, weekend- and holiday-aware, filterable by department. Pending is drawn alongside approved so cover is not granted twice onto one day |
 | A6.8 | Leave ↔ attendance integration (leave day ≠ absent) | ✅ |
 | A6.9 | Carry-forward & year-end processing | ✅ capped by the type (null uncapped, 0 off); an overdrawn balance starts at zero rather than in debt, and the roll is safe to run twice |
@@ -543,7 +543,21 @@ described B5.4 as still open for a while after the enum row landed.
 rather than from the previous edition of this file. Supersedes the stale build-status
 section of `Phase-1_Admin-Dashboard_Attendance_SOW.md`.*
 
-*Last verified 2026-09-17: `php artisan test` **1420 passed (3498 assertions)**,
+*Last verified 2026-09-21: `php artisan test` **1475 passed (3596 assertions)**,
+`flutter analyze` clean, `flutter test` **317 passed**, `composer audit` clean.
+The fourteen new server tests are `UnrosteredDayPolicyTest` — the default day,
+see A2.9. **The app count is unchanged because no Dart was touched**: the
+default day is read where status is decided, which is the server, and the app
+has never named a shift time of its own.*
+
+*Earlier the same day, before that change: 1461 passed (3565 assertions), which
+was the branch `fix/admin-empty-state-and-proxy-detection` read as it stood —
+three commits ahead of `main` and not yet merged. Those three carry their own
+tests: `UntrustedProxyTest` on both halves of the proxy work,
+`BreakThresholdTest` and `LateDayCountTest` on the server, and
+`history_punch_count_test.dart` on the phone.*
+
+*2026-09-17: `php artisan test` **1420 passed (3498 assertions)**,
 `flutter analyze` clean, `flutter test` 290 passed. The nine new tests are the
 page-size pair — see the note at the end of this file. The app count is
 unchanged because no Dart was touched.*

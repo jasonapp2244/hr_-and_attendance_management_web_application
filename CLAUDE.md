@@ -1307,6 +1307,38 @@ the Settings screen.
      everywhere — but record it as a decision rather than leaving it a discovery.
 - **Conditional rules engine** (A2.9, A6.6) — the policies are configurable, but
   there is no if-this-then-that builder.
+
+  **The policies really are all configurable as of 2026-09-21, which this line
+  had been claiming for a while and was not quite true.** `determineStatus()`
+  fell back to a literal `09:00:00`–`17:00:00` with 15 minutes' grace on any
+  day no shift was rostered for — an unplanned day, or a rostered day off
+  somebody worked anyway. It was the last business rule in the codebase that
+  no client could move, and it is wrong for any company that does not keep
+  office hours: an early shift judged against nine o'clock can never be
+  recorded as late at all, and nothing on any screen would have said why.
+
+  It is three company settings now — `default_day_start`, `default_day_end`,
+  `default_day_grace_minutes` — living in `Company::POLICY_DEFAULTS` beside the
+  eight that were already there, editable on the Policies screen, and read
+  through `AttendanceService::dayPolicy()`. **Company settings rather than a
+  config key**, deliberately: on a multi-company box one client's ordinary
+  morning is another's overtime, and `config/attendance.php` cannot say that.
+  The defaults are the literals they replaced, so no existing row is restated.
+
+  **A default day may not run overnight**, and the form refuses one with a
+  reason. A rostered night shift can, because its roster row carries the date
+  its hours belong to; an unrostered day has no such row, so an evening
+  arrival would be measured against tomorrow morning and every night worker
+  marked early. Stored and quietly wrong is the worse of the two outcomes.
+
+  Ten tests on the behaviour and four on the form, mutation-checked: ignoring
+  the company setting fails exactly the four that set one, and letting the
+  default outrank a rostered shift fails exactly the one that forbids it.
+  **Adding a required field to `PolicyController` breaks every fixture that
+  posts that form** — `SecurityPolicyTest` has seven, and the field list in
+  `test_the_policy_form_renders_with_every_field_on_it` is what stops a field
+  being required by the controller and missing from the blade, which locks the
+  whole page. Extend both when you add the next one.
 **Built since, and this list used to say otherwise:** the **2FA QR image** was
 recorded here as blocked, on the grounds that composer could not resolve a new
 dependency because of a `league/commonmark` advisory. On 2026-09-14 composer
